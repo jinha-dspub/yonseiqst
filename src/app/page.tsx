@@ -1,65 +1,105 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+export default function LandingPage() {
+  const router = useRouter();
+  const [studentId, setStudentId] = useState("");
+  const [password, setPassword] = useState("");
+  const [accessState, setAccessState] = useState<"idle" | "verifying" | "granted" | "denied">("idle");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAccessState("verifying");
+
+    setTimeout(() => {
+      let role = null;
+      if (studentId === "jinha" && password === "j2data2025!@") role = "jinha";
+      else if (studentId === "taeyeon" && password === "j2data2025!@") role = "taeyeon";
+      else if (studentId && password) role = "student"; // Any other ID is a mock student
+
+      if (role) {
+        sessionStorage.setItem("currentUser", role);
+        setAccessState("granted");
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 1500);
+      } else {
+        setAccessState("denied");
+        setTimeout(() => setAccessState("idle"), 2000);
+      }
+    }, 1500);
+  };
+
+  if (!mounted) return null;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen flex flex-col items-center justify-center bg-[var(--color-background)] relative overflow-hidden font-mono">
+      <div className="absolute inset-0 opacity-10 pointer-events-none"
+        style={{
+          backgroundImage: "linear-gradient(var(--color-primary) 1px, transparent 1px), linear-gradient(90deg, var(--color-primary) 1px, transparent 1px)",
+          backgroundSize: "40px 40px"
+        }}
+      />
+
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[var(--color-primary)] opacity-5 rounded-full blur-[100px] pointer-events-none" />
+
+      <div className="z-10 w-full max-w-md p-8 border border-[var(--color-card-border)] bg-[var(--color-card)]/50 backdrop-blur-md rounded-xl shadow-2xl relative">
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-accent)] tracking-widest uppercase mb-2">
+            YONSEI Q.S.T.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          <p className="text-[var(--color-foreground)]/60 text-sm uppercase tracking-[0.2em]">P.L.A.Y. Agent Protocol</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        <form onSubmit={handleLogin} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-wider text-[var(--color-primary)] font-semibold">Username / Agent ID</label>
+            <input
+              type="text"
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
+              className="w-full bg-black/50 border border-[var(--color-card-border)] rounded-md px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)] transition-all"
+              placeholder="홍길동"
+              disabled={accessState !== "idle"}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+
+          <button
+            type="submit"
+            disabled={accessState !== "idle"}
+            className="w-full relative overflow-hidden rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)]/10 px-6 py-3 font-semibold text-[var(--color-accent)] transition-all hover:bg-[var(--color-primary)]/30 active:scale-95 disabled:opacity-50 disabled:pointer-events-none mt-4"
           >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <span className="relative z-10 uppercase tracking-widest">
+              {accessState === "idle" ? "Initialize Sequence" : "Processing..."}
+            </span>
+          </button>
+        </form>
+
+        {accessState !== "idle" && (
+          <div className={`absolute inset-0 z-20 flex items-center justify-center rounded-xl backdrop-blur-sm transition-all duration-500
+            ${accessState === "granted" ? "bg-[var(--color-accent)]/20" : ""}
+            ${accessState === "denied" ? "bg-red-500/20" : ""}
+            ${accessState === "verifying" ? "bg-black/40" : ""}
+          `}>
+            <div className="text-center p-6 border bg-black/90 rounded-lg shadow-2xl border-[var(--color-card-border)]">
+              {accessState === "verifying" && (
+                <p className="text-[var(--color-primary)] animate-pulse uppercase tracking-widest font-bold">Verifying Credentials...</p>
+              )}
+              {accessState === "granted" && (
+                <p className="text-[var(--color-accent)] uppercase tracking-widest font-black text-xl drop-shadow-[0_0_10px_rgba(0,255,209,0.8)]">Access Granted</p>
+              )}
+              {accessState === "denied" && (
+                <p className="text-red-500 uppercase tracking-widest font-black text-xl drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]">Access Denied</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
