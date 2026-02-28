@@ -1,0 +1,42 @@
+{
+  "CMS": {
+    "header_title": "스튜디오 CMS",
+    "dashboard": "대시보드",
+    "logout": "로그아웃",
+    "tab_courses": "내 코스",
+    "tab_library": "콘텐츠 라이브러리",
+    "my_courses": "내 코스",
+    "my_courses_desc": "교육 콘텐츠를 구축하고 관리하세요.",
+    "new_course": "새 코스",
+    "library_title": "콘텐츠 라이브러리",
+    "library_desc": "문제 세트, 비디오, 텍스트 블록 등 재사용 가능한 학습 컴포넌트를 만들고 관리하여 여러 코스에서 사용할 수 있는 곳입니다.",
+    "coming_soon": "새 컴포넌트 만들기 (준비중)",
+    "edit_outline": "개요 편집"
+  },
+  "Modal": {
+    "create_title": "새 코스 만들기",
+    "edit_title": "코스 설정 편집",
+    "course_name": "코스 이름 (Course Name)",
+    "course_name_hint": "코스의 공개적인 표시 이름입니다.",
+    "organization": "조직 (Organization)",
+    "course_number": "코스 번호 (Course Number)",
+    "course_run": "진행 기수 (Course Run)",
+    "not_set": "설정 안 됨",
+    "id_note_create": "참고: 위 3개 필드가 조합되어 고유한 코스 URL이 생성되며 띄어쓰기를 포함할 수 없습니다.",
+    "id_note_edit": "참고: 핵심 식별자는 코스가 생성된 후에는 변경할 수 없습니다 (URL 변경 방지).",
+    "description": "설명 (선택사항)",
+    "cover_image": "커버 이미지 (선택사항)",
+    "upload_image": "이미지 파일 업로드",
+    "uploading": "업로드 중...",
+    "remove_image": "이미지 삭제",
+    "cancel": "취소",
+    "create": "코스 생성",
+    "save": "변경사항 저장",
+    "delete_course": "코스 삭제",
+    "confirm_delete_title": "코스 삭제 확인",
+    "confirm_delete_desc": "이 영구적인 작업을 확인하기 위해 관리자 증명서를 입력하세요. 'jinha' 및 'j2data2025'를 사용하세요.",
+    "username": "사용자 이름",
+    "password": "비밀번호",
+    "confirm_delete": "삭제 승인"
+  }
+}

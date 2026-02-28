@@ -8,10 +8,12 @@ export default function DashboardPage() {
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
     const [userProfile, setUserProfile] = useState<any>(null);
+    const [isStaff, setIsStaff] = useState(false);
 
     useEffect(() => {
         setMounted(true);
         const roleId = sessionStorage.getItem("currentUser") || "student";
+        setIsStaff(roleId === "staff" || roleId === "admin" || roleId === "superuser");
         // Check if the role is a mock user, otherwise default to student mock
         if (MockUsers[roleId]) {
             setUserProfile(MockUsers[roleId]);
@@ -101,9 +103,31 @@ export default function DashboardPage() {
                             Current Directive
                         </h2>
                         <p className="text-xl font-medium text-white">{userProfile.current_mission}</p>
-                        <button className="mt-4 w-full bg-[var(--color-accent)]/10 hover:bg-[var(--color-accent)]/20 border border-[var(--color-accent)]/50 text-[var(--color-accent)] uppercase tracking-widest text-sm font-bold py-3 rounded-md transition-all">
-                            Resume Mission
-                        </button>
+
+                        <div className="mt-6 flex flex-col gap-3">
+                            {isStaff ? (
+                                <button
+                                    onClick={() => router.push('/cms')}
+                                    className="w-full bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/50 text-emerald-400 uppercase tracking-widest text-sm font-bold py-3 rounded-md transition-all flex items-center justify-center gap-2"
+                                >
+                                    <span>⚙️ Open Studio CMS</span>
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => router.push('/lms')}
+                                    className="w-full bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-blue-400 uppercase tracking-widest text-sm font-bold py-3 rounded-md transition-all flex items-center justify-center gap-2"
+                                >
+                                    <span>📚 Enter LMS Catalog</span>
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => router.push('/hazard-hunt')}
+                                className="w-full bg-[var(--color-accent)]/10 hover:bg-[var(--color-accent)]/20 border border-[var(--color-accent)]/50 text-[var(--color-accent)] uppercase tracking-widest text-sm font-bold py-3 rounded-md transition-all"
+                            >
+                                Enter Escape Room
+                            </button>
+                        </div>
                     </div>
 
                     {/* Inventory */}

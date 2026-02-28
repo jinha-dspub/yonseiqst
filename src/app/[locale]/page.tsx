@@ -69,13 +69,25 @@ export default function LandingPage() {
             />
           </div>
 
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-wider text-[var(--color-primary)] font-semibold">Password / Security Key</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-black/50 border border-[var(--color-card-border)] rounded-md px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)] transition-all"
+              placeholder="••••••••"
+              disabled={accessState !== "idle"}
+            />
+          </div>
+
           <button
             type="submit"
             disabled={accessState !== "idle"}
             className="w-full relative overflow-hidden rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)]/10 px-6 py-3 font-semibold text-[var(--color-accent)] transition-all hover:bg-[var(--color-primary)]/30 active:scale-95 disabled:opacity-50 disabled:pointer-events-none mt-4"
           >
             <span className="relative z-10 uppercase tracking-widest">
-              {accessState === "idle" ? "Initialize Sequence" : "Processing..."}
+              {accessState === "idle" ? "Login (Initialize Sequence)" : "Processing..."}
             </span>
           </button>
         </form>

@@ -1,0 +1,42 @@
+{
+    "CMS": {
+        "header_title": "Studio CMS",
+        "dashboard": "Dashboard",
+        "logout": "Logout",
+        "tab_courses": "Courses",
+        "tab_library": "Content Library",
+        "my_courses": "My Courses",
+        "my_courses_desc": "Manage and build your educational content.",
+        "new_course": "New Course",
+        "library_title": "Content Library",
+        "library_desc": "This is where you will create, manage, and store reusable learning components like problem sets, video snippets, and text blocks to be used across multiple courses.",
+        "coming_soon": "Create New Component (Coming Soon)",
+        "edit_outline": "Edit Outline"
+    },
+    "Modal": {
+        "create_title": "Create New Course",
+        "edit_title": "Edit Course Settings",
+        "course_name": "Course Name",
+        "course_name_hint": "The public display name for your course.",
+        "organization": "Organization",
+        "course_number": "Course Number",
+        "course_run": "Course Run",
+        "not_set": "Not set",
+        "id_note_create": "Note: These 3 fields combine to create the unique course URL and cannot contain spaces.",
+        "id_note_edit": "Note: Core identifiers cannot be changed after a course is created as they break URLs.",
+        "description": "Description (Optional)",
+        "cover_image": "Cover Image (Optional)",
+        "upload_image": "Upload Image File",
+        "uploading": "Uploading...",
+        "remove_image": "Remove Image",
+        "cancel": "Cancel",
+        "create": "Create Course",
+        "save": "Save Changes",
+        "delete_course": "Delete Course",
+        "confirm_delete_title": "Confirm Course Deletion",
+        "confirm_delete_desc": "Please enter your admin credentials to confirm this permanent action. Use 'jinha' and 'j2data2025'.",
+        "username": "Username",
+        "password": "Password",
+        "confirm_delete": "Confirm Delete"
+    }
+}
