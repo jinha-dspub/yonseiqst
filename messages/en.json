@@ -38,5 +38,36 @@
         "username": "Username",
         "password": "Password",
         "confirm_delete": "Confirm Delete"
+    },
+    "LMS": {
+        "dashboard_title": "Learner Dashboard",
+        "course_catalog": "Course Catalog",
+        "back_to_hub": "Back to Mission Hub",
+        "welcome": "Welcome back, Student.",
+        "welcome_desc": "Continue your learning journey or enroll in new courses. Explore the catalog below to find your next objective.",
+        "search_placeholder": "Search for courses...",
+        "available_courses": "Available Courses",
+        "all_categories": "All Categories",
+        "no_courses_title": "No Courses Found",
+        "no_courses_desc": "There are currently no published courses matching your search.",
+        "sections": "Sections",
+        "no_desc": "No description provided.",
+        "start_learning": "Start Learning"
+    },
+    "CoursePlayer": {
+        "loading": "LOADING COURSE...",
+        "course_catalog": "Course Catalog",
+        "completed": "Completed",
+        "course_progress": "Course Progress",
+        "section": "Section",
+        "knowledge_check": "Knowledge Check",
+        "points": "Points",
+        "attempts": "Attempts",
+        "unlimited": "Unlimited",
+        "submit_answer": "Submit Answer",
+        "previous": "Previous",
+        "mark_completed": "Mark as Completed",
+        "next_unit": "Next Unit",
+        "no_content": "No content available to view."
     }
 }

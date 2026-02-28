@@ -10,6 +10,8 @@ import {
 import { Course, Section, Subsection, Unit, UnitComponent } from '@/lib/lms/types';
 import { getMockCourse } from '@/lib/lms/mockData';
 import ReactMarkdown from 'react-markdown';
+import { useTranslations, useLocale } from 'next-intl';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 // Helper to sanitize Youtube URLs for embedding
 function getYouTubeEmbedUrl(url: string) {
@@ -29,6 +31,10 @@ function getYouTubeEmbedUrl(url: string) {
 export default function LMSCoursePlayer() {
     const params = useParams();
     const router = useRouter();
+    const locale = useLocale();
+    const t = useTranslations('CoursePlayer');
+    const tLMS = useTranslations('LMS');
+
     const courseId = params.id as string;
 
     const [course, setCourse] = useState<Course | null>(null);
@@ -90,12 +96,12 @@ export default function LMSCoursePlayer() {
                     }
                 }
             } else {
-                router.push('/dashboard');
+                router.push(`/${locale}/dashboard`);
             }
         } else {
-            router.push('/dashboard');
+            router.push(`/${locale}/dashboard`);
         }
-    }, [courseId, router]);
+    }, [courseId, router, locale]);
 
     const toggleSection = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -111,7 +117,7 @@ export default function LMSCoursePlayer() {
         }
     };
 
-    if (!mounted || !course) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="animate-pulse font-bold text-slate-400">LOADING COURSE...</div></div>;
+    if (!mounted || !course) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="animate-pulse font-bold text-slate-400">{t('loading')}</div></div>;
 
     // Build linear array of all units for Next/Prev navigation
     let allUnits: { unit: Unit, subsectionName: string, sectionName: string }[] = [];
@@ -144,15 +150,16 @@ export default function LMSCoursePlayer() {
                     >
                         <Menu size={24} />
                     </button>
-                    <Link href="/lms" className="font-bold flex items-center gap-2 hover:text-emerald-400 transition-colors">
-                        <ArrowLeft size={16} /> Course Catalog
+                    <Link href={`/${locale}/lms`} className="font-bold flex items-center gap-2 hover:text-emerald-400 transition-colors">
+                        <ArrowLeft size={16} /> {t('course_catalog')}
                     </Link>
-                    <div className="h-4 w-px bg-slate-600"></div>
+                    <div className="h-4 w-px bg-slate-600 hidden md:block"></div>
                     <span className="font-semibold text-slate-300 text-sm truncate max-w-md hidden md:block">{course.title}</span>
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="text-xs bg-slate-800 text-emerald-400 px-3 py-1 rounded-full font-bold">
-                        {completedUnits.size} / {allUnits.length} Completed
+                    <LanguageSwitcher />
+                    <div className="text-xs bg-slate-800 text-emerald-400 px-3 py-1 rounded-full font-bold hidden sm:block">
+                        {completedUnits.size} / {allUnits.length} {t('completed')}
                     </div>
                 </div>
             </header>
@@ -162,7 +169,7 @@ export default function LMSCoursePlayer() {
                 {sidebarOpen && (
                     <aside className="w-[320px] bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-inner z-10 transition-all">
                         <div className="p-6">
-                            <h2 className="font-bold text-slate-800 tracking-tight text-lg mb-4">Course Progress</h2>
+                            <h2 className="font-bold text-slate-800 tracking-tight text-lg mb-4">{t('course_progress')}</h2>
 
                             <div className="space-y-4">
                                 {course.sections.map((section, sIdx) => {
@@ -175,7 +182,7 @@ export default function LMSCoursePlayer() {
                                                 onClick={(e) => toggleSection(section.id, e)}
                                             >
                                                 <div className="flex flex-col">
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Section {sIdx + 1}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('section')} {sIdx + 1}</span>
                                                     <span className="font-bold text-slate-800 text-sm">{section.title}</span>
                                                 </div>
                                                 <div className="text-slate-400">
@@ -322,11 +329,11 @@ export default function LMSCoursePlayer() {
                                                                 <div className="bg-emerald-100 text-emerald-700 p-2 rounded-lg">
                                                                     <ListTodo size={24} />
                                                                 </div>
-                                                                <h3 className="text-xl font-bold text-slate-800">Knowledge Check</h3>
+                                                                <h3 className="text-xl font-bold text-slate-800">{t('knowledge_check')}</h3>
                                                             </div>
                                                             <div className="flex gap-2">
-                                                                <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded uppercase">{comp.weight || 1} Points</span>
-                                                                <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded uppercase">{comp.attempts || 'Unlimited'} Attempts</span>
+                                                                <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded uppercase">{comp.weight || 1} {t('points')}</span>
+                                                                <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded uppercase">{comp.attempts === 0 || !comp.attempts ? t('unlimited') : comp.attempts} {t('attempts')}</span>
                                                             </div>
                                                         </div>
 
@@ -350,7 +357,7 @@ export default function LMSCoursePlayer() {
                                                                 }}
                                                                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-xl shadow-sm transition-colors"
                                                             >
-                                                                Submit Answer
+                                                                {t('submit_answer')}
                                                             </button>
                                                         </div>
                                                     </div>
@@ -369,7 +376,7 @@ export default function LMSCoursePlayer() {
                                                 disabled={!prevUnitId}
                                                 className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition-all ${prevUnitId ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-50 text-slate-300 cursor-not-allowed'}`}
                                             >
-                                                <ArrowLeft size={18} /> Previous
+                                                <ArrowLeft size={18} /> {t('previous')}
                                             </button>
 
                                             {!completedUnits.has(currentUnit.id) && (
@@ -377,7 +384,7 @@ export default function LMSCoursePlayer() {
                                                     onClick={markUnitCompleted}
                                                     className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-6 py-3 rounded-lg font-bold transition-all shadow-sm"
                                                 >
-                                                    Mark as Completed
+                                                    {t('mark_completed')}
                                                 </button>
                                             )}
 
@@ -389,7 +396,7 @@ export default function LMSCoursePlayer() {
                                                 disabled={!nextUnitId}
                                                 className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition-all ${nextUnitId ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md' : 'bg-emerald-100 text-emerald-300 cursor-not-allowed'}`}
                                             >
-                                                Next Unit <ArrowRight size={18} />
+                                                {t('next_unit')} <ArrowRight size={18} />
                                             </button>
                                         </div>
 
@@ -400,7 +407,7 @@ export default function LMSCoursePlayer() {
                     ) : (
                         <div className="h-full flex items-center justify-center text-slate-400 flex-col gap-4">
                             <BookOpen size={64} className="opacity-20" />
-                            <p className="text-lg">No content available to view.</p>
+                            <p className="text-lg">{t('no_content')}</p>
                         </div>
                     )}
                 </main>

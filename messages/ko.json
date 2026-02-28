@@ -38,5 +38,36 @@
     "username": "사용자 이름",
     "password": "비밀번호",
     "confirm_delete": "삭제 승인"
+  },
+  "LMS": {
+    "dashboard_title": "학습자 대시보드",
+    "course_catalog": "과정 카탈로그",
+    "back_to_hub": "미션 허브로 돌아가기",
+    "welcome": "환영합니다, 학생님.",
+    "welcome_desc": "학습 여정을 계속하거나 새로운 과정에 등록하세요. 아래 카탈로그를 탐색하여 다음 목표를 찾아보세요.",
+    "search_placeholder": "과정 검색...",
+    "available_courses": "수강 가능한 과정",
+    "all_categories": "모든 카테고리",
+    "no_courses_title": "과정을 찾을 수 없습니다",
+    "no_courses_desc": "현재 검색 조건과 일치하는 게시된 과정이 없습니다.",
+    "sections": "섹션",
+    "no_desc": "제공된 설명이 없습니다.",
+    "start_learning": "학습 시작하기"
+  },
+  "CoursePlayer": {
+    "loading": "과정 불러오는 중...",
+    "course_catalog": "과정 카탈로그",
+    "completed": "완료됨",
+    "course_progress": "학습 진도",
+    "section": "섹션",
+    "knowledge_check": "지식 점검",
+    "points": "점",
+    "attempts": "시도",
+    "unlimited": "무제한",
+    "submit_answer": "답안 제출",
+    "previous": "이전",
+    "mark_completed": "완료로 표시",
+    "next_unit": "다음 유닛",
+    "no_content": "볼 수 있는 콘텐츠가 없습니다."
   }
 }
