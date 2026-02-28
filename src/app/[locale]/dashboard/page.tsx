@@ -1,6 +1,6 @@
 "use client";
 
-import { MockUsers, MissionNodesMock } from "../../../lib/mockData";
+import { MockUsers, MissionNodesMock } from "@/lib/mockData";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 

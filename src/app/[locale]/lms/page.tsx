@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { BookOpen, Search, Filter, PlayCircle, ArrowLeft, ArrowRight, Gradcap, GraduationCap } from 'lucide-react';
+import { BookOpen, Search, Filter, PlayCircle, ArrowLeft, ArrowRight, GraduationCap } from 'lucide-react';
 import { Course } from '@/lib/lms/types';
 import { getMockCourse } from '@/lib/lms/mockData';
 import { useTranslations, useLocale } from 'next-intl';
