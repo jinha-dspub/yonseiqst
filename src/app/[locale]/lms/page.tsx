@@ -133,7 +133,8 @@ export default function LMSDashboard() {
 
             const { data, error } = await supabase.from('missions').select('*').eq('status', 'Published');
             if (data && !error) {
-                setMissions(data);
+                const hiddenTitles = ['광산 노예의 폐질환', '굴뚝청소부의 암', '이황화탄소 중독'];
+                setMissions(data.filter(m => !hiddenTitles.includes(m.title)));
             }
         };
 
@@ -258,7 +259,7 @@ export default function LMSDashboard() {
                     <div className="mb-6 flex items-center justify-between">
                         <h3 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
                             <Target className="text-rose-500" />
-                            Learning Atoms (Missions)
+                            Learning Missions
                         </h3>
                     </div>
 

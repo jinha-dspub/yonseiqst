@@ -32,6 +32,7 @@ export default function QuizRenderer({ content, componentId, courseId, onComplet
     const [attemptCount, setAttemptCount] = useState(0);
     const [retryTrigger, setRetryTrigger] = useState(0);
     const [uploadedFiles, setUploadedFiles] = useState<Record<string, { name: string; size: number; type: string; data: string }[]>>({});
+    const [manualGrades, setManualGrades] = useState<Record<string, { score: number; feedback: string; gradedAt: string }>>({});
 
     const supabase = createClient();
 
@@ -154,6 +155,9 @@ export default function QuizRenderer({ content, componentId, courseId, onComplet
                     setTotalScore(data.score || 0);
                     setAttemptCount(data.attempt_count || 1);
                     setIsSubmitted(true);
+                    if (data.manual_grades) {
+                        setManualGrades(data.manual_grades);
+                    }
                 }
             } catch (e) {
                 console.error("Failed to load quiz submission", e);
@@ -504,6 +508,24 @@ export default function QuizRenderer({ content, componentId, courseId, onComplet
                                         <div className="mt-1">Acceptable answers: {(prob as ShortAnswerProblem).acceptable_answers.join(', ')}</div>
                                     )}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Instructor Manual Grade Feedback */}
+                        {isSubmitted && manualGrades[prob.id] && (
+                            <div className="mt-4 p-4 bg-purple-50 text-purple-800 rounded-xl text-sm leading-relaxed border border-purple-200">
+                                <div className="flex items-center justify-between mb-1">
+                                    <strong className="flex items-center gap-1.5">👨‍🏫 교수자 채점</strong>
+                                    <span className="font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-lg text-xs">
+                                        {manualGrades[prob.id].score}/{prob.points}점
+                                    </span>
+                                </div>
+                                {manualGrades[prob.id].feedback && (
+                                    <p className="mt-2 text-purple-700 italic">💬 {manualGrades[prob.id].feedback}</p>
+                                )}
+                                <p className="text-[10px] text-purple-400 mt-2">
+                                    채점일: {new Date(manualGrades[prob.id].gradedAt).toLocaleString('ko-KR')}
+                                </p>
                             </div>
                         )}
                     </div>

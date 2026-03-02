@@ -88,26 +88,16 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
             {/* Trigger Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-4 bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm hover:border-blue-300 hover:bg-blue-50 transition-all duration-300"
+                className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm hover:border-blue-300 hover:bg-blue-50 transition-all duration-300"
             >
-                <div className="text-right">
-                    <p className="text-[10px] text-blue-600 uppercase font-bold tracking-widest mb-0.5">Agent Status</p>
-                    <div className="flex flex-col items-end">
-                        <div className="flex items-baseline gap-2 justify-end">
-                            <span className="text-xl font-black text-slate-800">{userProfile.name}</span>
-                            <span className="text-slate-500 text-[10px] font-mono hidden sm:inline-block tracking-tight">{userProfile.email}</span>
-                        </div>
-                        {userProfile.cohort && userProfile.cohort !== 'DEFAULT' && (
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase mt-0.5 tracking-wider border border-emerald-200">
-                                Cohort: {userProfile.cohort}
-                            </span>
-                        )}
-                    </div>
+                <div className="w-7 h-7 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+                    <User size={14} />
                 </div>
-                <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0 shadow-sm">
-                    <User size={20} />
-                </div>
-                <ChevronDown size={16} className={`text-blue-600 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                <span className="text-sm font-bold text-slate-800 max-w-[120px] truncate hidden sm:block">{userProfile.name}</span>
+                {userProfile.cohort && userProfile.cohort !== 'DEFAULT' && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title={`Cohort: ${userProfile.cohort}`}></span>
+                )}
+                <ChevronDown size={14} className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Dropdown Menu */}

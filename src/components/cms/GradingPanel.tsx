@@ -101,21 +101,31 @@ export default function GradingPanel({ course, courseId }: GradingPanelProps) {
         if (data) {
             setSubmissions(data);
             
-            // Load user profiles
+            // Load user profiles (try profiles table, then users table as fallback)
             const userIds = [...new Set(data.map(s => s.user_id))];
             if (userIds.length > 0) {
-                // Try to get profiles or just use user IDs
                 const profiles: Record<string, string> = {};
                 for (const uid of userIds) {
-                    const { data: userData } = await supabase
+                    // Try profiles table first
+                    const { data: profileData } = await supabase
                         .from('profiles')
                         .select('full_name, email')
                         .eq('id', uid)
                         .single();
-                    if (userData) {
-                        profiles[uid] = userData.full_name || userData.email || uid.slice(0, 8);
+                    if (profileData && (profileData.full_name || profileData.email)) {
+                        profiles[uid] = profileData.full_name || profileData.email;
                     } else {
-                        profiles[uid] = uid.slice(0, 8) + '...';
+                        // Fallback to users table (legacy)
+                        const { data: userData } = await supabase
+                            .from('users')
+                            .select('name, email')
+                            .eq('id', uid)
+                            .single();
+                        if (userData) {
+                            profiles[uid] = userData.name || userData.email || uid.slice(0, 8);
+                        } else {
+                            profiles[uid] = uid.slice(0, 8) + '...';
+                        }
                     }
                 }
                 setUserProfiles(profiles);

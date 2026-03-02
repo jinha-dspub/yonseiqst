@@ -29,25 +29,5 @@ export const MockUsers: Record<string, any> = {
 };
 
 export const MissionNodesMock = [
-    {
-        id: "node_1",
-        era: "고대",
-        title: "광산 노예의 폐질환",
-        status: "Clear",
-        reward: "히포크라테스 기록물",
-    },
-    {
-        id: "node_2",
-        era: "산업혁명",
-        title: "굴뚝청소부의 암",
-        status: "In Progress",
-        reward: "퍼시벌 포트의 외과 가위",
-    },
-    {
-        id: "node_3",
-        era: "현대",
-        title: "이황화탄소 중독",
-        status: "Locked",
-        reward: "최신 방독 마스크",
-    },
+    // 실제 미션 데이터는 추후 추가 예정
 ];
