@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { BookOpen, Plus, LogOut, Settings, UploadCloud, Loader2, Library, Trash2 } from 'lucide-react';
+import { BookOpen, Plus, LogOut, Settings, Library, Trash2 } from 'lucide-react';
 import { Course } from '@/lib/lms/types';
 import { getMockCourse } from '@/lib/lms/mockData';
-import { supabase } from '@/lib/supabase';
+import { getCourses, saveCourseToDb, deleteCourseFromDb } from '@/lib/courseService';
 import { useTranslations, useLocale } from 'next-intl';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import MediaLibrarySelector from "@/components/cms/MediaLibrarySelector";
+import { createClient } from "@/lib/supabaseClient";
 
 export default function CMSDashboard() {
     const router = useRouter();
@@ -18,6 +20,7 @@ export default function CMSDashboard() {
 
     const [courses, setCourses] = useState<Course[]>([]);
     const [mounted, setMounted] = useState(false);
+    const [userRole, setUserRole] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'courses' | 'library'>('courses');
 
     // Modal states
@@ -27,67 +30,92 @@ export default function CMSDashboard() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteCreds, setDeleteCreds] = useState({ username: '', password: '' });
     const [deleteError, setDeleteError] = useState('');
-    const [uploadError, setUploadError] = useState('');
-    const [courseForm, setCourseForm] = useState({
+    const [showCourseModal, setShowCourseModal] = useState(false); // New state
+    const [courseFormData, setCourseFormData] = useState<Partial<Course>>({ // Replaced courseForm
         title: '',
         organization: '',
         courseNumber: '',
         courseRun: '',
         description: '',
-        imageUrl: ''
+        thumbnail: '' // Changed from imageUrl to thumbnail
     });
-    const [isUploading, setIsUploading] = useState(false);
+    const [showMediaSelector, setShowMediaSelector] = useState(false); // New state
 
     useEffect(() => {
-        setMounted(true);
-        // Load mock course or from localStorage
-        const saved = sessionStorage.getItem('lms_courses_db');
-        if (saved) {
-            setCourses(JSON.parse(saved));
-        } else {
-            const initialCourse = getMockCourse();
-            setCourses([initialCourse]);
-            sessionStorage.setItem('lms_courses_db', JSON.stringify([initialCourse]));
-        }
-    }, []);
+        const checkAuth = async () => {
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user) {
+                router.push(`/${locale}`);
+                return;
+            }
+
+            const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
+            const role = userData?.role || "student";
+            
+            if (role === 'student') {
+                router.push(`/${locale}/dashboard`);
+                return;
+            }
+
+            setUserRole(role);
+            setMounted(true);
+
+            // Once authorized, load courses
+            const dbCourses = await getCourses();
+            if (dbCourses.length > 0) {
+                setCourses(dbCourses);
+                localStorage.setItem('lms_courses_db', JSON.stringify(dbCourses));
+            } else {
+                const saved = localStorage.getItem('lms_courses_db');
+                const initial: Course[] = saved ? JSON.parse(saved) : [getMockCourse()];
+                setCourses(initial);
+                for (const c of initial) {
+                    await saveCourseToDb(c);
+                }
+                localStorage.setItem('lms_courses_db', JSON.stringify(initial));
+            }
+        };
+        checkAuth();
+    }, [locale, router]);
 
     const handleLogout = () => {
         sessionStorage.removeItem("currentUser");
         router.push(`/${locale}/dashboard`);
     };
 
-    const handleAddCourse = (e: React.FormEvent) => {
+    const handleAddCourse = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Generate Open edX style ID or fallback to timestamp
         let newId = `course_${Date.now()}`;
-        if (courseForm.organization && courseForm.courseNumber && courseForm.courseRun) {
-            // Remove spaces from the fields to make URL-friendly
-            const org = courseForm.organization.replace(/\s+/g, '');
-            const num = courseForm.courseNumber.replace(/\s+/g, '');
-            const run = courseForm.courseRun.replace(/\s+/g, '');
+        if (courseFormData.organization && courseFormData.courseNumber && courseFormData.courseRun) {
+            const org = courseFormData.organization.replace(/\s+/g, '');
+            const num = courseFormData.courseNumber.replace(/\s+/g, '');
+            const run = courseFormData.courseRun.replace(/\s+/g, '');
             newId = `${org}+${num}+${run}`;
         }
 
         const newCourse: Course = {
             id: newId,
-            title: courseForm.title || t('Modal.create_title'),
-            organization: courseForm.organization || undefined,
-            courseNumber: courseForm.courseNumber || undefined,
-            courseRun: courseForm.courseRun || undefined,
-            description: courseForm.description || "A brand new course.",
-            imageUrl: courseForm.imageUrl || undefined,
+            title: courseFormData.title || t('Modal.create_title'),
+            organization: courseFormData.organization || undefined,
+            courseNumber: courseFormData.courseNumber || undefined,
+            courseRun: courseFormData.courseRun || undefined,
+            description: courseFormData.description || "A brand new course.",
+            thumbnail: courseFormData.thumbnail || undefined,
             sections: [],
             status: "draft",
         };
         const updatedCourses = [...courses, newCourse];
         setCourses(updatedCourses);
-        sessionStorage.setItem('lms_courses_db', JSON.stringify(updatedCourses));
+        localStorage.setItem('lms_courses_db', JSON.stringify(updatedCourses));
+        await saveCourseToDb(newCourse);
         setIsCreateModalOpen(false);
-        setCourseForm({ title: '', organization: '', courseNumber: '', courseRun: '', description: '', imageUrl: '' });
+        setCourseFormData({ title: '', organization: '', courseNumber: '', courseRun: '', description: '', thumbnail: '' });
     };
 
-    const handleEditCourse = (e: React.FormEvent) => {
+    const handleEditCourse = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingCourseId) return;
 
@@ -95,26 +123,27 @@ export default function CMSDashboard() {
             if (c.id === editingCourseId) {
                 return {
                     ...c,
-                    title: courseForm.title,
-                    organization: courseForm.organization || undefined,
-                    courseNumber: courseForm.courseNumber || undefined,
-                    courseRun: courseForm.courseRun || undefined,
-                    description: courseForm.description,
-                    imageUrl: courseForm.imageUrl || undefined
+                    title: courseFormData.title || "Untitled Course",
+                    organization: courseFormData.organization || undefined,
+                    courseNumber: courseFormData.courseNumber || undefined,
+                    courseRun: courseFormData.courseRun || undefined,
+                    description: courseFormData.description || "",
+                    thumbnail: courseFormData.thumbnail || undefined
                 };
             }
             return c;
         });
 
         setCourses(updatedCourses);
-        sessionStorage.setItem('lms_courses_db', JSON.stringify(updatedCourses));
+        localStorage.setItem('lms_courses_db', JSON.stringify(updatedCourses));
+        const updated = updatedCourses.find(c => c.id === editingCourseId);
+        if (updated) await saveCourseToDb(updated);
         setIsEditModalOpen(false);
         setEditingCourseId(null);
-        setCourseForm({ title: '', organization: '', courseNumber: '', courseRun: '', description: '', imageUrl: '' });
+        setCourseFormData({ title: '', organization: '', courseNumber: '', courseRun: '', description: '', thumbnail: '' });
     };
 
-    const handleDeleteCourse = (courseId: string) => {
-        // Authenticate the delete action
+    const handleDeleteCourse = async (courseId: string) => {
         if (deleteCreds.username !== 'jinha' || deleteCreds.password !== 'j2data2025') {
             setDeleteError('Invalid username or password.');
             return;
@@ -122,72 +151,37 @@ export default function CMSDashboard() {
 
         const updatedCourses = courses.filter(c => c.id !== courseId);
         setCourses(updatedCourses);
-        sessionStorage.setItem('lms_courses_db', JSON.stringify(updatedCourses));
+        localStorage.setItem('lms_courses_db', JSON.stringify(updatedCourses));
+        await deleteCourseFromDb(courseId);
         setIsEditModalOpen(false);
         setEditingCourseId(null);
         setShowDeleteConfirm(false);
         setDeleteCreds({ username: '', password: '' });
-        setCourseForm({ title: '', organization: '', courseNumber: '', courseRun: '', description: '', imageUrl: '' });
-    };
-
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setIsUploading(true);
-        setUploadError('');
-        try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-            const filePath = `${fileName}`;
-
-            // Upload directly to Supabase Storage 'course-images' bucket
-            const { error: uploadError } = await supabase.storage
-                .from('course-images')
-                .upload(filePath, file);
-
-            if (uploadError) {
-                throw uploadError;
-            }
-
-            // Get public URL
-            const { data } = supabase.storage
-                .from('course-images')
-                .getPublicUrl(filePath);
-
-            setCourseForm(prev => ({ ...prev, imageUrl: data.publicUrl }));
-        } catch (error) {
-            console.error('Error uploading image:', error);
-            setUploadError('Failed to upload image. Please try again.');
-        } finally {
-            setIsUploading(false);
-        }
+        setCourseFormData({ title: '', organization: '', courseNumber: '', courseRun: '', description: '', thumbnail: '' });
     };
 
     const openCreateModal = () => {
-        setCourseForm({ title: '', organization: '', courseNumber: '', courseRun: '', description: '', imageUrl: '' });
-        setUploadError('');
+        setCourseFormData({ title: '', organization: '', courseNumber: '', courseRun: '', description: '', thumbnail: '' }); // Changed from imageUrl to thumbnail
         setIsCreateModalOpen(true);
     };
 
     const openEditModal = (course: Course) => {
-        setCourseForm({
+        setCourseFormData({
             title: course.title,
             organization: course.organization || '',
             courseNumber: course.courseNumber || '',
             courseRun: course.courseRun || '',
             description: course.description,
-            imageUrl: course.imageUrl || ''
+            thumbnail: course.thumbnail || '' // Changed from imageUrl to thumbnail
         });
         setEditingCourseId(course.id);
         setShowDeleteConfirm(false);
         setDeleteCreds({ username: '', password: '' });
         setDeleteError('');
-        setUploadError('');
         setIsEditModalOpen(true);
     };
 
-    if (!mounted) return null;
+    if (!mounted || userRole === 'student') return null;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
@@ -250,11 +244,11 @@ export default function CMSDashboard() {
                             {courses.map(course => (
                                 <div key={course.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition-all group flex flex-col h-full">
                                     <div
-                                        className={`h-32 border-b border-slate-200 flex items-center justify-center relative ${course.imageUrl ? 'bg-cover bg-center' : 'bg-slate-100 text-slate-300'}`}
-                                        style={course.imageUrl ? { backgroundImage: `url(${course.imageUrl})` } : {}}
+                                        className={`h-32 border-b border-slate-200 flex items-center justify-center relative ${course.thumbnail ? 'bg-cover bg-center' : 'bg-slate-100 text-slate-300'}`}
+                                        style={course.thumbnail ? { backgroundImage: `url(${course.thumbnail})` } : {}}
                                     >
-                                        {course.imageUrl && <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />}
-                                        {!course.imageUrl && <BookOpen size={48} className="opacity-20 group-hover:scale-110 transition-transform duration-300 relative z-10" />}
+                                        {course.thumbnail && <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />}
+                                        {!course.thumbnail && <BookOpen size={48} className="opacity-20 group-hover:scale-110 transition-transform duration-300 relative z-10" />}
 
                                         <div className="absolute top-3 right-3 flex gap-2 z-20">
                                             <button
@@ -297,9 +291,12 @@ export default function CMSDashboard() {
                         <p className="text-slate-500 max-w-md mb-8">
                             {t('CMS.library_desc')}
                         </p>
-                        <button className="bg-emerald-600 text-white px-6 py-2.5 rounded-lg font-medium shadow-sm opacity-50 cursor-not-allowed">
-                            {t('CMS.coming_soon')}
-                        </button>
+                        <Link
+                            href={`/${locale}/cms/content-library`}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-medium shadow-sm transition-all active:scale-95"
+                        >
+                            Content Library 열기 →
+                        </Link>
                     </div>
                 )}
             </main>
@@ -320,8 +317,8 @@ export default function CMSDashboard() {
                                     type="text"
                                     required
                                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                    value={courseForm.title}
-                                    onChange={e => setCourseForm({ ...courseForm, title: e.target.value })}
+                                    value={courseFormData.title}
+                                    onChange={e => setCourseFormData({ ...courseFormData, title: e.target.value })}
                                 />
                                 <p className="text-xs text-slate-400 mt-1">{t('Modal.course_name_hint')}</p>
                             </div>
@@ -333,8 +330,8 @@ export default function CMSDashboard() {
                                         type="text"
                                         required
                                         className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                        value={courseForm.organization}
-                                        onChange={e => setCourseForm({ ...courseForm, organization: e.target.value })}
+                                        value={courseFormData.organization}
+                                        onChange={e => setCourseFormData({ ...courseFormData, organization: e.target.value })}
                                     />
                                 </div>
                                 <div>
@@ -343,8 +340,8 @@ export default function CMSDashboard() {
                                         type="text"
                                         required
                                         className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                        value={courseForm.courseNumber}
-                                        onChange={e => setCourseForm({ ...courseForm, courseNumber: e.target.value })}
+                                        value={courseFormData.courseNumber}
+                                        onChange={e => setCourseFormData({ ...courseFormData, courseNumber: e.target.value })}
                                     />
                                 </div>
                                 <div>
@@ -353,8 +350,8 @@ export default function CMSDashboard() {
                                         type="text"
                                         required
                                         className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                        value={courseForm.courseRun}
-                                        onChange={e => setCourseForm({ ...courseForm, courseRun: e.target.value })}
+                                        value={courseFormData.courseRun}
+                                        onChange={e => setCourseFormData({ ...courseFormData, courseRun: e.target.value })}
                                     />
                                 </div>
                                 <div className="col-span-full">
@@ -366,35 +363,35 @@ export default function CMSDashboard() {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">{t('Modal.description')}</label>
                                 <textarea
                                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px]"
-                                    value={courseForm.description}
-                                    onChange={e => setCourseForm({ ...courseForm, description: e.target.value })}
+                                    value={courseFormData.description}
+                                    onChange={e => setCourseFormData({ ...courseFormData, description: e.target.value })}
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">{t('Modal.cover_image')}</label>
-                                <div className="flex items-center gap-4">
-                                    {courseForm.imageUrl && (
-                                        <div className="w-16 h-16 rounded overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-200">
-                                            <img src={courseForm.imageUrl} alt="Cover Preview" className="w-full h-full object-cover" />
-                                        </div>
-                                    )}
-                                    <label className={`flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 text-sm font-medium transition-colors w-full cursor-pointer hover:bg-slate-50 hover:border-emerald-500 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                                        {isUploading ? <Loader2 size={16} className="animate-spin text-emerald-600" /> : <UploadCloud size={18} className="text-slate-500" />}
-                                        <span className="text-slate-600">{isUploading ? t('Modal.uploading') : t('Modal.upload_image')}</span>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={handleImageUpload}
-                                            disabled={isUploading}
-                                        />
-                                    </label>
+                                <div className="flex gap-2 mb-4">
+                                    <input
+                                        type="text"
+                                        placeholder="Thumbnail URL (Optional)"
+                                        value={courseFormData.thumbnail || ""}
+                                        onChange={(e) => setCourseFormData({...courseFormData, thumbnail: e.target.value})}
+                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowMediaSelector(true)}
+                                        className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-600 px-4 py-2 rounded-md transition-colors text-sm font-bold whitespace-nowrap"
+                                    >
+                                        Library
+                                    </button>
                                 </div>
-                                {uploadError && (
-                                    <p className="text-xs text-rose-500 mt-2 font-medium">{uploadError}</p>
+                                {courseFormData.thumbnail && (
+                                    <div className="w-32 h-20 rounded overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-200 mb-2">
+                                        <img src={courseFormData.thumbnail} alt="Cover Preview" className="w-full h-full object-cover" />
+                                    </div>
                                 )}
-                                {courseForm.imageUrl && (
-                                    <button type="button" onClick={() => setCourseForm({ ...courseForm, imageUrl: '' })} className="text-xs text-rose-500 mt-2 hover:underline">{t('Modal.remove_image')}</button>
+                                {courseFormData.thumbnail && (
+                                    <button type="button" onClick={() => setCourseFormData({ ...courseFormData, thumbnail: '' })} className="text-xs text-rose-500 mt-2 hover:underline">{t('Modal.remove_image')}</button>
                                 )}
                             </div>
                             <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
@@ -407,8 +404,7 @@ export default function CMSDashboard() {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={isUploading}
-                                    className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
+                                    className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
                                 >
                                     {t('Modal.create')}
                                 </button>
@@ -435,8 +431,8 @@ export default function CMSDashboard() {
                                     type="text"
                                     required
                                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                    value={courseForm.title}
-                                    onChange={e => setCourseForm({ ...courseForm, title: e.target.value })}
+                                    value={courseFormData.title}
+                                    onChange={e => setCourseFormData({ ...courseFormData, title: e.target.value })}
                                 />
                             </div>
 
@@ -446,7 +442,7 @@ export default function CMSDashboard() {
                                     <input
                                         type="text"
                                         className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-400"
-                                        value={courseForm.organization}
+                                        value={courseFormData.organization}
                                         disabled
                                         placeholder={t('Modal.not_set')}
                                     />
@@ -456,7 +452,7 @@ export default function CMSDashboard() {
                                     <input
                                         type="text"
                                         className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-400"
-                                        value={courseForm.courseNumber}
+                                        value={courseFormData.courseNumber}
                                         disabled
                                         placeholder={t('Modal.not_set')}
                                     />
@@ -466,7 +462,7 @@ export default function CMSDashboard() {
                                     <input
                                         type="text"
                                         className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-400"
-                                        value={courseForm.courseRun}
+                                        value={courseFormData.courseRun}
                                         disabled
                                         placeholder={t('Modal.not_set')}
                                     />
@@ -480,35 +476,35 @@ export default function CMSDashboard() {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">{t('Modal.description')}</label>
                                 <textarea
                                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px]"
-                                    value={courseForm.description}
-                                    onChange={e => setCourseForm({ ...courseForm, description: e.target.value })}
+                                    value={courseFormData.description}
+                                    onChange={e => setCourseFormData({ ...courseFormData, description: e.target.value })}
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">{t('Modal.cover_image')}</label>
-                                <div className="flex items-center gap-4">
-                                    {courseForm.imageUrl && (
-                                        <div className="w-16 h-16 rounded overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-200">
-                                            <img src={courseForm.imageUrl} alt="Cover Preview" className="w-full h-full object-cover" />
-                                        </div>
-                                    )}
-                                    <label className={`flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 text-sm font-medium transition-colors w-full cursor-pointer hover:bg-slate-50 hover:border-emerald-500 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                                        {isUploading ? <Loader2 size={16} className="animate-spin text-emerald-600" /> : <UploadCloud size={18} className="text-slate-500" />}
-                                        <span className="text-slate-600">{isUploading ? t('Modal.uploading') : t('Modal.upload_image')}</span>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={handleImageUpload}
-                                            disabled={isUploading}
-                                        />
-                                    </label>
+                                <div className="flex gap-2 mb-4">
+                                    <input
+                                        type="text"
+                                        placeholder="Thumbnail URL (Optional)"
+                                        value={courseFormData.thumbnail || ""}
+                                        onChange={(e) => setCourseFormData({...courseFormData, thumbnail: e.target.value})}
+                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowMediaSelector(true)}
+                                        className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-600 px-4 py-2 rounded-md transition-colors text-sm font-bold whitespace-nowrap"
+                                    >
+                                        Library
+                                    </button>
                                 </div>
-                                {uploadError && (
-                                    <p className="text-xs text-rose-500 mt-2 font-medium">{uploadError}</p>
+                                {courseFormData.thumbnail && (
+                                    <div className="w-32 h-20 rounded overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-200 mb-2">
+                                        <img src={courseFormData.thumbnail} alt="Cover Preview" className="w-full h-full object-cover" />
+                                    </div>
                                 )}
-                                {courseForm.imageUrl && (
-                                    <button type="button" onClick={() => setCourseForm({ ...courseForm, imageUrl: '' })} className="text-xs text-rose-500 mt-2 hover:underline">{t('Modal.remove_image')}</button>
+                                {courseFormData.thumbnail && (
+                                    <button type="button" onClick={() => setCourseFormData({ ...courseFormData, thumbnail: '' })} className="text-xs text-rose-500 mt-2 hover:underline">{t('Modal.remove_image')}</button>
                                 )}
                             </div>
                             {showDeleteConfirm && (
@@ -580,8 +576,7 @@ export default function CMSDashboard() {
                                         </button>
                                         <button
                                             type="submit"
-                                            disabled={isUploading}
-                                            className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
+                                            className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
                                         >
                                             {t('Modal.save')}
                                         </button>
@@ -591,6 +586,13 @@ export default function CMSDashboard() {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {showMediaSelector && (
+                <MediaLibrarySelector 
+                    onSelectOption={(url) => setCourseFormData({...courseFormData, thumbnail: url})}
+                    onClose={() => setShowMediaSelector(false)}
+                />
             )}
         </div>
     );

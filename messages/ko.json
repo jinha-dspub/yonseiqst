@@ -41,6 +41,7 @@
   },
   "LMS": {
     "dashboard_title": "학습자 대시보드",
+    "my_courses": "수강 중인 과정",
     "course_catalog": "과정 카탈로그",
     "back_to_hub": "미션 허브로 돌아가기",
     "welcome": "환영합니다, 학생님.",

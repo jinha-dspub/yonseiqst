@@ -41,6 +41,7 @@
     },
     "LMS": {
         "dashboard_title": "Learner Dashboard",
+        "my_courses": "My Courses",
         "course_catalog": "Course Catalog",
         "back_to_hub": "Back to Mission Hub",
         "welcome": "Welcome back, Student.",

@@ -9,7 +9,7 @@ export function getMockCourse(): Course {
         courseRun: "2026_T1",
         description: "산업보건의 기초부터 심화까지 다루는 핵심 강의입니다. Open edX 구조로 설계되었습니다.",
         status: "published",
-        imageUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+        thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
         sections: [
             {
                 id: "sec-1",

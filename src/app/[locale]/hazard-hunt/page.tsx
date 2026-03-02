@@ -4,7 +4,7 @@ import React, { useState, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, useHelper, Float, Text } from "@react-three/drei";
 import * as THREE from 'three';
-import { SCENARIOS } from "../../engine/hazard-hunt/rules_kosha";
+import { SCENARIOS } from "../../../engine/hazard-hunt/rules_kosha";
 
 // A floating point light that follows the mouse loosely (Flashlight effect)
 function Flashlight() {

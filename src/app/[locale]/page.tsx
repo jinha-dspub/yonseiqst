@@ -3,36 +3,36 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+import { createClient } from "@/lib/supabaseClient"; 
+
 export default function LandingPage() {
   const router = useRouter();
-  const [studentId, setStudentId] = useState("");
-  const [password, setPassword] = useState("");
   const [accessState, setAccessState] = useState<"idle" | "verifying" | "granted" | "denied">("idle");
   const [mounted, setMounted] = useState(false);
 
+  const supabase = createClient();
+
   useEffect(() => setMounted(true), []);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
     setAccessState("verifying");
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/api/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
 
-    setTimeout(() => {
-      let role = null;
-      if (studentId === "jinha" && password === "j2data2025!@") role = "jinha";
-      else if (studentId === "taeyeon" && password === "j2data2025!@") role = "taeyeon";
-      else if (studentId && password) role = "student"; // Any other ID is a mock student
-
-      if (role) {
-        sessionStorage.setItem("currentUser", role);
-        setAccessState("granted");
-        setTimeout(() => {
-          router.push("/dashboard");
-        }, 1500);
-      } else {
-        setAccessState("denied");
-        setTimeout(() => setAccessState("idle"), 2000);
-      }
-    }, 1500);
+    if (error) {
+       console.error("Login failed", error);
+       setAccessState("denied");
+       setTimeout(() => setAccessState("idle"), 2000);
+    }
   };
 
   if (!mounted) return null;
@@ -56,41 +56,29 @@ export default function LandingPage() {
           <p className="text-[var(--color-foreground)]/60 text-sm uppercase tracking-[0.2em]">P.L.A.Y. Agent Protocol</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-xs uppercase tracking-wider text-[var(--color-primary)] font-semibold">Username / Agent ID</label>
-            <input
-              type="text"
-              value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-              className="w-full bg-black/50 border border-[var(--color-card-border)] rounded-md px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)] transition-all"
-              placeholder="홍길동"
-              disabled={accessState !== "idle"}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs uppercase tracking-wider text-[var(--color-primary)] font-semibold">Password / Security Key</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-black/50 border border-[var(--color-card-border)] rounded-md px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)] transition-all"
-              placeholder="••••••••"
-              disabled={accessState !== "idle"}
-            />
-          </div>
+        <div className="space-y-6">
+          <p className="text-[10px] text-[var(--color-primary)] uppercase font-bold tracking-widest text-center mb-4">
+            Authorized Personnel Only
+          </p>
 
           <button
-            type="submit"
+            onClick={handleGoogleLogin}
             disabled={accessState !== "idle"}
-            className="w-full relative overflow-hidden rounded-md border border-[var(--color-primary)] bg-[var(--color-primary)]/10 px-6 py-3 font-semibold text-[var(--color-accent)] transition-all hover:bg-[var(--color-primary)]/30 active:scale-95 disabled:opacity-50 disabled:pointer-events-none mt-4"
+            className="w-full relative overflow-hidden flex items-center justify-center gap-3 rounded-md border border-[var(--color-primary)] bg-[var(--color-card)] px-6 py-4 font-semibold text-white transition-all hover:bg-[var(--color-primary)]/20 active:scale-95 disabled:opacity-50 disabled:pointer-events-none mt-4 shadow-[0_0_15px_rgba(0,103,172,0.3)]"
           >
-            <span className="relative z-10 uppercase tracking-widest">
-              {accessState === "idle" ? "Login (Initialize Sequence)" : "Processing..."}
+            <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+              <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
+                <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
+                <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
+                <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"/>
+                <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
+              </g>
+            </svg>
+            <span className="relative z-10 uppercase tracking-widest text-sm">
+              {accessState === "idle" ? "Sign In with Google" : "Connecting..."}
             </span>
           </button>
-        </form>
+        </div>
 
         {accessState !== "idle" && (
           <div className={`absolute inset-0 z-20 flex items-center justify-center rounded-xl backdrop-blur-sm transition-all duration-500

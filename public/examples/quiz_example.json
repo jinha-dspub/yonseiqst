@@ -1,0 +1,62 @@
+{
+  "bankName": "직업환경의학 기말고사 예시",
+  "problems": [
+    {
+      "id": "q1",
+      "type": "multiple_choice",
+      "question": "직업병의 3대 요인이 아닌 것은?",
+      "imageUrl": null,
+      "options": ["물리적 요인", "화학적 요인", "사회적 요인", "생물학적 요인"],
+      "answer": 2,
+      "points": 5,
+      "explanation": "직업병의 3대 요인은 물리적, 화학적, 생물학적 요인입니다. 사회적 요인은 3대 요인에 포함되지 않습니다."
+    },
+    {
+      "id": "q2",
+      "type": "multiple_choice",
+      "question": "소음성 난청의 진단 기준으로 올바른 것은?",
+      "imageUrl": null,
+      "options": [
+        "1000Hz에서 30dB 이상 역치 상승",
+        "4000Hz에서 일측 또는 양측의 순음청력 역치가 40dB 이상",
+        "500Hz에서 50dB 이상 역치 상승",
+        "모든 주파수에서 20dB 이상 역치 상승"
+      ],
+      "answer": 1,
+      "points": 5,
+      "explanation": "소음성 난청은 4000Hz에서 일측 또는 양측의 청력 역치가 40dB 이상일 때 진단합니다."
+    },
+    {
+      "id": "q3",
+      "type": "short_answer",
+      "question": "작업환경측정 결과 노출기준 초과 시 사업주가 취해야 하는 조치의 기한은?",
+      "acceptable_answers": ["60일", "60일 이내", "2개월"],
+      "points": 5,
+      "explanation": "작업환경 측정 결과 노출기준을 초과하면 60일 이내에 작업환경 개선 등 필요한 조치를 해야 합니다."
+    },
+    {
+      "id": "q4",
+      "type": "descriptive",
+      "question": "산업안전보건법상 근로자 건강진단의 종류 3가지를 설명하시오.",
+      "min_length": 100,
+      "keywords": ["일반건강진단", "특수건강진단", "배치전건강진단"],
+      "points": 10,
+      "explanation": "1) 일반건강진단: 모든 근로자 대상, 2) 특수건강진단: 유해인자 노출 근로자), 3) 배치전건강진단: 유해업무 배치 전 실시"
+    },
+    {
+      "id": "q5",
+      "type": "multiple_choice",
+      "question": "다음 그림에서 나타내는 보호구의 종류는?",
+      "imageUrl": "https://example.com/safety_equipment.png",
+      "options": [
+        {"text": "방진마스크", "imageUrl": null},
+        {"text": "방독마스크", "imageUrl": null},
+        {"text": "송기마스크", "imageUrl": null},
+        {"text": "전동식 호흡보호구", "imageUrl": null}
+      ],
+      "answer": 0,
+      "points": 5,
+      "explanation": "방진마스크는 분진을 걸러주는 필터가 장착된 호흡보호구입니다."
+    }
+  ]
+}
