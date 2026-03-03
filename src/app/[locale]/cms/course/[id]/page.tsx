@@ -1995,7 +1995,7 @@ export default function CourseOutlineEditor() {
                                         Enter email addresses separated by commas. These users (if they hold the 'lecturer' role) will be granted CMS edit access to this course.
                                     </div>
                                     <textarea
-                                        className="w-full border text-left border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white placeholder-slate-400 min-h-[60px]"
+                                        className="w-full border text-left border-slate-300 rounded px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white placeholder-slate-400 min-h-[60px]"
                                         placeholder="e.g. lecturer1@ex.com, teacher@school.edu"
                                         value={(course.lecturers || []).join(', ')}
                                         onChange={(e) => {
