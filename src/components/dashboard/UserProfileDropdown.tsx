@@ -39,9 +39,23 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
         setNewName(initialProfile?.name || "");
     }, [initialProfile]);
 
-    const handleSignOut = () => {
-        sessionStorage.removeItem("currentUser");
-        router.push("/");
+    const handleSignOut = async () => {
+        try {
+            console.log("Attempting Sign Out...");
+            const supabase = createClient();
+            const { error } = await supabase.auth.signOut();
+            if (error) console.error("Supabase SignOut Error:", error);
+
+            sessionStorage.removeItem("currentUser");
+            console.log("Session cleared, redirecting to home...");
+
+            // Hard refresh to clear all states and cookies
+            window.location.href = "/";
+        } catch (err) {
+            console.error("Sign Out Click Error:", err);
+            // Fallback redirect
+            window.location.href = "/";
+        }
     };
 
     const handleLanguageChange = (newLocale: string) => {
@@ -62,19 +76,19 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
         setIsSaving(true);
         const supabase = createClient();
         const { error } = await supabase
-            .from('users')
-            .update({ name: newName.trim() })
+            .from('profiles')
+            .update({ full_name: newName.trim() })
             .eq('id', userProfile.id);
 
         if (!error) {
             const updatedProfile = { ...userProfile, name: newName.trim() };
             setUserProfile(updatedProfile);
             sessionStorage.setItem("currentUser", JSON.stringify(updatedProfile));
-            
+
             // Trigger a custom event to update other components if needed
             window.dispatchEvent(new CustomEvent('userProfileUpdated', { detail: updatedProfile }));
 
-            const { data } = await supabase.auth.updateUser({ data: { full_name: newName.trim() }});
+            await supabase.auth.updateUser({ data: { full_name: newName.trim() } });
         }
         setIsSaving(false);
         setShowAccountSettings(false);
@@ -121,26 +135,26 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
                                     <User size={16} className="text-blue-600" />
                                     Profile
                                 </button>
-                                
+
                                 {['staff', 'admin', 'superuser'].includes(userProfile.role) && (
                                     <>
                                         <div className="h-px bg-slate-100 my-1 mx-2"></div>
                                         <p className="px-5 py-1 text-[10px] text-emerald-600 uppercase font-bold tracking-widest mt-1">Admin Tools</p>
-                                        <button 
+                                        <button
                                             onClick={() => { window.open(`/${locale}/cms/cohorts`, '_blank'); setIsOpen(false); }}
                                             className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center gap-3"
                                         >
                                             <Users size={16} className="text-emerald-500" />
                                             Cohort Management
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => { window.open(`/${locale}/cms`, '_blank'); setIsOpen(false); }}
                                             className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center gap-3"
                                         >
                                             <Database size={16} className="text-emerald-500" />
                                             CMS Dashboard
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => { window.open(`/${locale}/cms/content-library`, '_blank'); setIsOpen(false); }}
                                             className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center gap-3"
                                         >
@@ -152,7 +166,7 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
 
                                 <div className="h-px bg-slate-100 my-1 mx-2"></div>
 
-                                <button 
+                                <button
                                     onClick={() => setShowAccountSettings(true)}
                                     className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center gap-3"
                                 >
@@ -160,7 +174,7 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
                                     Account Settings
                                 </button>
 
-                                <button 
+                                <button
                                     onClick={() => setShowLanguageSettings(true)}
                                     className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center justify-between"
                                 >
@@ -171,7 +185,7 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{locale}</span>
                                 </button>
                                 <div className="h-px bg-slate-100 my-1 mx-2"></div>
-                                <button 
+                                <button
                                     onClick={handleSignOut}
                                     className="w-full text-left px-5 py-3 text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors flex items-center gap-3"
                                 >
@@ -182,7 +196,7 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
                         ) : showProfile ? (
                             <>
                                 <div className="px-5 py-3 flex items-center gap-3 border-b border-slate-100 mb-2 bg-slate-50">
-                                    <button 
+                                    <button
                                         onClick={() => setShowProfile(false)}
                                         className="text-slate-500 hover:text-slate-800 p-1 -ml-2 rounded-md hover:bg-slate-200 transition-colors"
                                     >
@@ -214,7 +228,7 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
                         ) : showLanguageSettings ? (
                             <>
                                 <div className="px-5 py-3 flex items-center gap-3 border-b border-slate-100 mb-1 bg-slate-50">
-                                    <button 
+                                    <button
                                         onClick={() => setShowLanguageSettings(false)}
                                         className="text-slate-500 hover:text-slate-800 p-1 -ml-2 rounded-md hover:bg-slate-200 transition-colors"
                                     >
@@ -222,20 +236,18 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
                                     </button>
                                     <span className="text-xs font-bold uppercase tracking-widest text-slate-700">Language / 언어</span>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => handleLanguageChange('ko')}
-                                    className={`w-full text-left px-5 py-3 text-sm font-medium flex items-center gap-3 transition-colors ${
-                                        locale === 'ko' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
-                                    }`}
+                                    className={`w-full text-left px-5 py-3 text-sm font-medium flex items-center gap-3 transition-colors ${locale === 'ko' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                                        }`}
                                 >
                                     <span className={`w-2 h-2 rounded-full ${locale === 'ko' ? 'bg-blue-600 shadow-sm' : 'bg-transparent border border-slate-300'}`}></span>
                                     한국어
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => handleLanguageChange('en')}
-                                    className={`w-full text-left px-5 py-3 text-sm font-medium flex items-center gap-3 transition-colors ${
-                                        locale === 'en' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
-                                    }`}
+                                    className={`w-full text-left px-5 py-3 text-sm font-medium flex items-center gap-3 transition-colors ${locale === 'en' ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                                        }`}
                                 >
                                     <span className={`w-2 h-2 rounded-full ${locale === 'en' ? 'bg-blue-600 shadow-sm' : 'bg-transparent border border-slate-300'}`}></span>
                                     English (EN)
@@ -244,7 +256,7 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
                         ) : (
                             <>
                                 <div className="px-5 py-3 flex items-center gap-3 border-b border-slate-100 mb-2 bg-slate-50">
-                                    <button 
+                                    <button
                                         onClick={() => setShowAccountSettings(false)}
                                         className="text-slate-500 hover:text-slate-800 p-1 -ml-2 rounded-md hover:bg-slate-200 transition-colors"
                                     >
@@ -254,26 +266,26 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
                                 </div>
                                 <div className="px-5 pb-3 pt-1 border-b border-slate-100 mb-1">
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Display Name</label>
-                                    <input 
-                                        type="text" 
+                                    <input
+                                        type="text"
                                         value={newName}
                                         onChange={(e) => setNewName(e.target.value)}
                                         className="w-full bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none mb-3"
                                         placeholder="Enter your name"
                                     />
                                     <div className="flex gap-2">
-                                        <button 
+                                        <button
                                             onClick={() => setShowAccountSettings(false)}
                                             className="flex-1 px-3 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
                                         >
                                             Cancel
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={handleSaveName}
                                             disabled={isSaving || !newName.trim() || newName === userProfile.name}
                                             className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
                                         >
-                                            {isSaving ? 'Saving...' : <><Check size={14}/> Save</>}
+                                            {isSaving ? 'Saving...' : <><Check size={14} /> Save</>}
                                         </button>
                                     </div>
                                 </div>

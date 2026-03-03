@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import UserProfileDropdown from "@/components/dashboard/UserProfileDropdown";
 import { MissionNodesMock } from "@/lib/mockData";
 import { getCourses } from "@/lib/courseService";
-import { BookOpen, PlayCircle, ArrowRight, RefreshCw } from "lucide-react";
+import { BookOpen, PlayCircle, ArrowRight, RefreshCw, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 
@@ -19,6 +19,17 @@ export default function DashboardPage() {
     const [isStaff, setIsStaff] = useState(false);
     const [assignedCourse, setAssignedCourse] = useState<any>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const handleDirectSignOut = async () => {
+        try {
+            const supabase2 = createClient();
+            await supabase2.auth.signOut();
+            sessionStorage.removeItem("currentUser");
+        } catch (e) {
+            console.error("SignOut error:", e);
+        }
+        window.location.href = "/";
+    };
 
     useEffect(() => {
         setMounted(true);
@@ -49,22 +60,22 @@ export default function DashboardPage() {
         }
 
         setIsStaff(role === "staff" || role === "admin" || role === "superuser");
-        
+
         // Fetch courses to find assigned ones
         const allCourses = await getCourses();
         const publishedCourses = allCourses.filter(c => c.status === 'published');
-        
+
         // Find courses specifically for this user's cohort
-        const cohortCourses = publishedCourses.filter(c => 
+        const cohortCourses = publishedCourses.filter(c =>
             c.visibility === 'cohort' && (
                 (c.allowedCohorts && cohortId && c.allowedCohorts.includes(cohortId)) ||
                 (c.allowedCohorts && c.allowedCohorts.includes(cohort)) // Fallback for name-based (deprecated)
             )
         );
-        
+
         // If no cohort specific, maybe show public ones
         const publicCourses = publishedCourses.filter(c => c.visibility === 'public');
-        
+
         const priorityCourse = cohortCourses[0] || publicCourses[0];
         if (priorityCourse) {
             setAssignedCourse(priorityCourse);
@@ -77,12 +88,12 @@ export default function DashboardPage() {
             agent_id: role.toUpperCase(),
             role: role,
             cohort: cohort,
-            level: 1, 
-            exp: 0,   
+            level: 1,
+            exp: 0,
             inventory: [],
             current_mission: priorityCourse ? priorityCourse.title : "Waiting for Assignment"
         };
-        
+
         setUserProfile(profile);
         sessionStorage.setItem("currentUser", JSON.stringify(profile));
         setIsRefreshing(false);
@@ -102,7 +113,7 @@ export default function DashboardPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-4">
-                    <button 
+                    <button
                         onClick={loadUserData}
                         disabled={isRefreshing}
                         className={`p-2 rounded-full border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all ${isRefreshing ? 'animate-spin text-blue-600' : ''}`}
@@ -111,6 +122,14 @@ export default function DashboardPage() {
                         <RefreshCw size={18} />
                     </button>
                     <UserProfileDropdown userProfile={userProfile} />
+                    <button
+                        onClick={handleDirectSignOut}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 rounded-lg transition-all"
+                        title="Sign Out"
+                    >
+                        <LogOut size={16} />
+                        <span className="hidden sm:block">Sign Out</span>
+                    </button>
                 </div>
             </header>
 
@@ -127,18 +146,18 @@ export default function DashboardPage() {
                             <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
                             Current Directive
                         </h2>
-                        
+
                         <div className="relative z-10">
                             <p className="text-3xl font-black text-slate-800 mb-4 tracking-tight leading-tight">
                                 {userProfile.current_mission}
                             </p>
-                            
+
                             {assignedCourse ? (
                                 <div className="space-y-6">
                                     <p className="text-slate-600 font-medium max-w-md line-clamp-2">
                                         {assignedCourse.description || "No mission brief available for this objective."}
                                     </p>
-                                    <button 
+                                    <button
                                         onClick={() => router.push(`/${locale}/lms/course/${assignedCourse.id}`)}
                                         className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black px-8 py-4 rounded-xl shadow-lg shadow-indigo-200 transition-all hover:-translate-y-0.5 active:translate-y-0"
                                     >
@@ -178,7 +197,7 @@ export default function DashboardPage() {
                 {/* Right Column: Access Portals - LMS & Games (1 col) */}
                 <section className="space-y-8 lg:col-span-1">
                     <h2 className="text-xl font-bold uppercase tracking-widest border-l-4 border-blue-500 pl-3 text-slate-800">Access Portals</h2>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* LMS Catalog */}
                         <div className="rounded-xl border border-blue-200 bg-white p-6 shadow-sm flex flex-col h-full transform transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-blue-400 group">
