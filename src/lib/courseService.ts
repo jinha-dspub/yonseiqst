@@ -74,11 +74,12 @@ function rowToCourse(row: any): Course {
         // sections etc. are stored in the content JSONB blob
         ...content,
         sections: content.sections || [],
+        lecturers: content.lecturers || [],
     } as Course;
 }
 
 function courseToRow(course: Course) {
-    const { id, title, organization, courseNumber, courseRun, description, thumbnail, status, visibility, allowedCohorts, publishDate, sections, ...rest } = course;
+    const { id, title, organization, courseNumber, courseRun, description, thumbnail, status, visibility, allowedCohorts, publishDate, sections, lecturers, ...rest } = course;
     return {
         id,
         title,
@@ -91,7 +92,7 @@ function courseToRow(course: Course) {
         visibility: visibility || "public",
         allowed_cohorts: allowedCohorts || [],
         publish_date: publishDate || null,
-        content: { ...rest, sections: sections || [] }, // stores sections, etc.
+        content: { ...rest, sections: sections || [], lecturers: lecturers || [] }, // stores sections, etc.
         updated_at: new Date().toISOString(),
     };
 }

@@ -77,6 +77,9 @@ export interface Course extends BaseEntity {
     organization?: string;
     courseNumber?: string;
     courseRun?: string;
+
+    // Access Control
+    lecturers?: string[]; // Array of lecturer email addresses
 }
 
 // --- Advanced Quiz Data Structures ---

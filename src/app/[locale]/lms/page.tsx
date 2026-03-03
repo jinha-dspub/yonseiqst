@@ -24,6 +24,7 @@ export default function LMSDashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const [userProfile, setUserProfile] = useState<any>(null);
     const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
+    const [pendingCourseIds, setPendingCourseIds] = useState<Set<string>>(new Set());
     const [notifications, setNotifications] = useState<any[]>([]);
 
     useEffect(() => {
@@ -67,9 +68,10 @@ export default function LMSDashboard() {
             sessionStorage.setItem("currentUser", JSON.stringify(profile));
 
             // Load enrollments
-            const { data: enrollData } = await supabase.from('enrollments').select('course_id').eq('user_id', user.id).eq('status', 'active');
+            const { data: enrollData } = await supabase.from('enrollments').select('course_id, status').eq('user_id', user.id).in('status', ['active', 'pending']);
             if (enrollData) {
-                setEnrolledCourseIds(new Set(enrollData.map(e => e.course_id)));
+                setEnrolledCourseIds(new Set(enrollData.filter(e => e.status === 'active').map(e => e.course_id)));
+                setPendingCourseIds(new Set(enrollData.filter(e => e.status === 'pending').map(e => e.course_id)));
             }
 
             // Load unread notifications
@@ -150,12 +152,26 @@ export default function LMSDashboard() {
 
     const handleEnroll = async (courseId: string) => {
         if (!userProfile) return;
+
+        // Find if this is a cohort-assigned course
+        const currentCourse = courses.find(c => c.id === courseId);
+        const isCohortAssigned = currentCourse?.visibility === 'cohort';
+
+        // Cohort-assigned courses auto-enroll as active. Public courses require approval (pending).
+        const statusToSet = isCohortAssigned ? 'active' : 'pending';
+
         await supabase.from('enrollments').upsert({
             user_id: userProfile.id,
             course_id: courseId,
-            status: 'active'
+            status: statusToSet
         }, { onConflict: 'user_id,course_id' });
-        setEnrolledCourseIds(prev => new Set([...prev, courseId]));
+
+        if (statusToSet === 'active') {
+            setEnrolledCourseIds(prev => new Set([...prev, courseId]));
+            router.push(`/${locale}/lms/course/${courseId}`);
+        } else {
+            setPendingCourseIds(prev => new Set([...prev, courseId]));
+        }
     };
 
     // "My Courses" = cohort-restricted courses where the student's cohort IS assigned
@@ -316,7 +332,7 @@ export default function LMSDashboard() {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {myCourses.map(course => (
-                                <CourseCard key={course.id} course={course} t={t} locale={locale} router={router} isEnrolled={enrolledCourseIds.has(course.id)} onEnroll={handleEnroll} />
+                                <CourseCard key={course.id} course={course} t={t} locale={locale} router={router} isEnrolled={enrolledCourseIds.has(course.id)} isPending={pendingCourseIds.has(course.id)} onEnroll={handleEnroll} />
                             ))}
                         </div>
                     )}
@@ -342,7 +358,7 @@ export default function LMSDashboard() {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {availableCourses.map(course => (
-                                <CourseCard key={course.id} course={course} t={t} locale={locale} router={router} isEnrolled={enrolledCourseIds.has(course.id)} onEnroll={handleEnroll} />
+                                <CourseCard key={course.id} course={course} t={t} locale={locale} router={router} isEnrolled={enrolledCourseIds.has(course.id)} isPending={pendingCourseIds.has(course.id)} onEnroll={handleEnroll} />
                             ))}
                         </div>
                     )}
@@ -353,7 +369,7 @@ export default function LMSDashboard() {
 }
 
 // Sub-component for course card
-function CourseCard({ course, t, locale, router, isEnrolled, onEnroll }: { course: Course, t: any, locale: string, router: any, isEnrolled?: boolean, onEnroll?: (courseId: string) => void }) {
+function CourseCard({ course, t, locale, router, isEnrolled, isPending, onEnroll }: { course: Course, t: any, locale: string, router: any, isEnrolled?: boolean, isPending?: boolean, onEnroll?: (courseId: string) => void }) {
     return (
         <div key={course.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-xl hover:border-blue-300 transition-all group flex flex-col h-full shadow-sm">
             <div
@@ -376,6 +392,11 @@ function CourseCard({ course, t, locale, router, isEnrolled, onEnroll }: { cours
                     <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded ${course.visibility === 'cohort' ? 'text-emerald-600 bg-emerald-50' : 'text-blue-600 bg-blue-50'}`}>
                         {course.sections.length} {t('sections')}
                     </span>
+                    {isPending && (
+                        <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded bg-amber-100 text-amber-700">
+                            승인 대기 중
+                        </span>
+                    )}
                 </div>
                 <h4 className="text-xl font-bold text-slate-800 mb-2 line-clamp-2 leading-tight">
                     {course.title}
@@ -385,19 +406,24 @@ function CourseCard({ course, t, locale, router, isEnrolled, onEnroll }: { cours
                 </p>
 
                 <button
+                    disabled={isPending}
                     onClick={async () => {
+                        if (isPending) return;
                         if (!isEnrolled && onEnroll) {
                             await onEnroll(course.id);
+                        } else if (isEnrolled) {
+                            router.push(`/${locale}/lms/course/${course.id}`);
                         }
-                        router.push(`/${locale}/lms/course/${course.id}`);
                     }}
-                    className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm ${course.visibility === 'cohort'
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
-                        : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
+                    className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm ${isPending
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                            : course.visibility === 'cohort'
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
+                                : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
                         }`}
                 >
-                    {isEnrolled ? t('start_learning') : '수강 시작하기'}
-                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                    {isPending ? '수강 승인 대기 중' : isEnrolled ? t('start_learning') : '수강 신청하기'}
+                    {!isPending && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
                 </button>
             </div>
         </div>

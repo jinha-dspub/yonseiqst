@@ -98,11 +98,10 @@ function QuizBankPicker({ comp, updateComponent }: { comp: UnitComponent; update
                             <button
                                 key={m.mode}
                                 onClick={() => updateComponent(comp.id, { quizMode: m.mode })}
-                                className={`p-3 rounded-lg text-center transition-all border-2 ${
-                                    comp.quizMode === m.mode
-                                        ? 'bg-purple-50 border-purple-500 text-purple-700'
-                                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                                }`}
+                                className={`p-3 rounded-lg text-center transition-all border-2 ${comp.quizMode === m.mode
+                                    ? 'bg-purple-50 border-purple-500 text-purple-700'
+                                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                                    }`}
                             >
                                 <div className="text-sm font-bold">{m.label}</div>
                                 <div className="text-[10px] mt-0.5">{m.desc}</div>
@@ -162,11 +161,10 @@ function QuizBankPicker({ comp, updateComponent }: { comp: UnitComponent; update
                                         <span className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[9px] font-bold">{idx + 1}</span>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-1.5 mb-0.5">
-                                                <span className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-                                                    q.type === 'multiple_choice' ? 'bg-blue-100 text-blue-700' :
+                                                <span className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${q.type === 'multiple_choice' ? 'bg-blue-100 text-blue-700' :
                                                     q.type === 'short_answer' ? 'bg-amber-100 text-amber-700' :
-                                                    'bg-purple-100 text-purple-700'
-                                                }`}>
+                                                        'bg-purple-100 text-purple-700'
+                                                    }`}>
                                                     {q.type === 'multiple_choice' ? 'MC' : q.type === 'short_answer' ? 'SA' : 'DESC'}
                                                 </span>
                                                 <span className="text-[8px] text-slate-400 font-bold">{q.points}pts</span>
@@ -198,14 +196,17 @@ export default function CourseOutlineEditor() {
     const [course, setCourse] = useState<Course | null>(null);
     const [mounted, setMounted] = useState(false);
     const [userRole, setUserRole] = useState<string | null>(null);
-    const [allCohorts, setAllCohorts] = useState<{id: string, name: string, program_id: string}[]>([]);
-    const [allPrograms, setAllPrograms] = useState<{id: string, name: string}[]>([]);
+    const [allCohorts, setAllCohorts] = useState<{ id: string, name: string, program_id: string }[]>([]);
+    const [allPrograms, setAllPrograms] = useState<{ id: string, name: string }[]>([]);
     const [cohortSearch, setCohortSearch] = useState('');
-    const [cmsView, setCmsView] = useState<'editor' | 'grading' | 'announcements'>('editor');
+    const [cmsView, setCmsView] = useState<'editor' | 'grading' | 'announcements' | 'enrollments'>('editor');
     const [cmsAnnouncements, setCmsAnnouncements] = useState<any[]>([]);
     const [newAnnTitle, setNewAnnTitle] = useState('');
     const [newAnnContent, setNewAnnContent] = useState('');
     const [newAnnPinned, setNewAnnPinned] = useState(false);
+
+    // Enrollments State
+    const [courseEnrollments, setCourseEnrollments] = useState<any[]>([]);
 
     // UI State for expanded nodes
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
@@ -220,13 +221,13 @@ export default function CourseOutlineEditor() {
 
     // Markdown preview state & Asset Library state
     const [previewModes, setPreviewModes] = useState<Record<string, boolean>>({});
-    const [showAssetLibrary, setShowAssetLibrary] = useState<{isOpen: boolean, targetCompId: string | null}>({isOpen: false, targetCompId: null});
-    
+    const [showAssetLibrary, setShowAssetLibrary] = useState<{ isOpen: boolean, targetCompId: string | null }>({ isOpen: false, targetCompId: null });
+
     const [collapsedComponents, setCollapsedComponents] = useState<Set<string>>(new Set());
 
     // Expanded unit components in the sidebar outline
     const [expandedUnitComponents, setExpandedUnitComponents] = useState<Set<string>>(new Set());
-    
+
     // Drag-and-drop state for component reordering
     const [dragOverUnitId, setDragOverUnitId] = useState<string | null>(null);
     const [dragSourceUnitId, setDragSourceUnitId] = useState<string | null>(null);
@@ -255,7 +256,7 @@ export default function CourseOutlineEditor() {
         const checkAuth = async () => {
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
-            
+
             if (!user) {
                 router.push(`/${locale}`);
                 return;
@@ -263,7 +264,7 @@ export default function CourseOutlineEditor() {
 
             const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
             const role = userData?.role || "student";
-            
+
             if (role === 'student') {
                 router.push(`/${locale}/dashboard`);
                 return;
@@ -282,6 +283,12 @@ export default function CourseOutlineEditor() {
             // Once authorized, load the course
             const dbCourse = await getCourseById(courseId) || await getCourseById(rawCourseId);
             if (dbCourse) {
+                // If lecturer, they must be in the lecturers array to edit it
+                if (role === 'lecturer' && (!dbCourse.lecturers || !user.email || !dbCourse.lecturers.includes(user.email))) {
+                    router.push(`/${locale}/cms`);
+                    return;
+                }
+
                 setCourse(dbCourse);
                 if (dbCourse.sections.length > 0) {
                     setExpandedSections(new Set([dbCourse.sections[0].id]));
@@ -291,12 +298,18 @@ export default function CourseOutlineEditor() {
                 }
                 return;
             }
-            
+
             const saved = localStorage.getItem('lms_courses_db');
             if (saved) {
                 const courses: Course[] = JSON.parse(saved);
                 const found = courses.find(c => c.id === courseId || c.id === rawCourseId);
                 if (found) {
+                    // Check lecturer access
+                    if (role === 'lecturer' && (!found.lecturers || !user.email || !found.lecturers.includes(user.email))) {
+                        router.push(`/${locale}/cms`);
+                        return;
+                    }
+
                     setCourse(found);
                     if (found.sections.length > 0) {
                         setExpandedSections(new Set([found.sections[0].id]));
@@ -323,7 +336,7 @@ export default function CourseOutlineEditor() {
             const newCourses = courses.map(c => c.id === updatedCourse.id ? updatedCourse : c);
             localStorage.setItem('lms_courses_db', JSON.stringify(newCourses));
         }
-        
+
         // Persist to Supabase
         setSyncStatus('saving');
         setLastSyncError(null);
@@ -462,16 +475,16 @@ export default function CourseOutlineEditor() {
         const newSections = [...course.sections];
         const unit = newSections[selectedSecIdx].subsections[selectedSubIdx].units[selectedUnitIdx];
         const compIdx = unit.components.findIndex(c => c.id === compId);
-        
+
         if (compIdx < 0) return;
         if (direction === 'up' && compIdx === 0) return;
         if (direction === 'down' && compIdx === unit.components.length - 1) return;
-        
+
         const targetIdx = direction === 'up' ? compIdx - 1 : compIdx + 1;
         const temp = unit.components[compIdx];
         unit.components[compIdx] = unit.components[targetIdx];
         unit.components[targetIdx] = temp;
-        
+
         saveCourse({ ...course, sections: newSections });
     };
 
@@ -687,21 +700,36 @@ export default function CourseOutlineEditor() {
                             >
                                 📢 공지
                             </button>
+                            <button
+                                onClick={async () => {
+                                    setCmsView('enrollments');
+                                    const { data } = await createClient()
+                                        .from('enrollments')
+                                        .select('*, profiles(full_name, email)')
+                                        .eq('course_id', courseId)
+                                        .order('created_at', { ascending: false });
+                                    if (data) setCourseEnrollments(data);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${cmsView === 'enrollments' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
+                            >
+                                👥 신청
+                            </button>
                         </div>
-                        <button
-                            className="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white px-2 py-1 rounded flex items-center gap-1 text-xs font-bold transition-colors"
-                            onClick={() => {
-                                const newSec: Section = {
-                                    id: `sec-${Date.now()}`,
-                                    title: `New Section ${course.sections.length + 1}`,
-                                    status: 'draft',
-                                    subsections: []
-                                };
-                                saveCourse({ ...course, sections: [...course.sections, newSec] });
-                            }}
-                        >
-                            <Plus size={14} /> Section
-                        </button>
+                        {cmsView === 'editor' && (
+                            <button
+                                className="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white px-2 py-1 rounded flex items-center gap-1 text-xs font-bold transition-colors"
+                                onClick={() => {
+                                    const newSec: Section = {
+                                        id: `sec-${Date.now()}`,
+                                        title: `New Section ${course.sections.length + 1}`,
+                                        status: 'draft',
+                                        subsections: []
+                                    };
+                                    saveCourse({ ...course, sections: [...course.sections, newSec] });
+                                }}
+                            >
+                                <Plus size={14} /> Section
+                            </button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-3 outline-tree custom-scrollbar">
@@ -953,8 +981,8 @@ export default function CourseOutlineEditor() {
                                                                                     ${dragOverUnitId === unit.id && dragSourceUnitId !== unit.id
                                                                                         ? 'bg-blue-50 text-blue-700 border-2 border-dashed border-blue-400'
                                                                                         : isSelected
-                                                                                        ? 'bg-emerald-50 text-emerald-800 shadow-sm border border-emerald-100'
-                                                                                        : 'hover:bg-slate-100 text-slate-600 border border-transparent'}
+                                                                                            ? 'bg-emerald-50 text-emerald-800 shadow-sm border border-emerald-100'
+                                                                                            : 'hover:bg-slate-100 text-slate-600 border border-transparent'}
                                                                                 `}
                                                                             >
                                                                                 {/* Custom line connector for unit */}
@@ -1019,10 +1047,9 @@ export default function CourseOutlineEditor() {
 
                                                                             {/* Expandable components list */}
                                                                             {expandedUnitComponents.has(unit.id) && unit.components && unit.components.length > 0 && (
-                                                                                <div 
-                                                                                    className={`ml-7 pl-2 mt-1 mb-1 space-y-0.5 border-l border-dashed border-slate-200 transition-colors ${
-                                                                                        dragOverUnitId === unit.id ? 'border-blue-400 bg-blue-50/50 rounded-r' : ''
-                                                                                    }`}
+                                                                                <div
+                                                                                    className={`ml-7 pl-2 mt-1 mb-1 space-y-0.5 border-l border-dashed border-slate-200 transition-colors ${dragOverUnitId === unit.id ? 'border-blue-400 bg-blue-50/50 rounded-r' : ''
+                                                                                        }`}
                                                                                     onDragOver={(e) => { e.preventDefault(); setDragOverUnitId(unit.id); }}
                                                                                     onDragLeave={() => setDragOverUnitId(null)}
                                                                                     onDrop={(e) => {
@@ -1048,17 +1075,16 @@ export default function CourseOutlineEditor() {
                                                                                             title={comp.title || comp.content}
                                                                                         >
                                                                                             <span className="text-slate-300 group-hover/comp:text-slate-400 cursor-grab">⠿</span>
-                                                                                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                                                                                comp.type === 'html' ? 'bg-blue-400' :
+                                                                                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${comp.type === 'html' ? 'bg-blue-400' :
                                                                                                 comp.type === 'video' ? 'bg-red-400' :
-                                                                                                comp.type === 'embed' ? 'bg-purple-400' :
-                                                                                                comp.type === 'quiz' ? 'bg-amber-400' : 'bg-slate-400'
-                                                                                            }`}></span>
+                                                                                                    comp.type === 'embed' ? 'bg-purple-400' :
+                                                                                                        comp.type === 'quiz' ? 'bg-amber-400' : 'bg-slate-400'
+                                                                                                }`}></span>
                                                                                             <span className="font-bold uppercase tracking-wider text-[9px] w-10 flex-shrink-0 text-slate-400">
                                                                                                 {comp.type === 'html' ? 'TXT' :
-                                                                                                 comp.type === 'video' ? 'VID' :
-                                                                                                 comp.type === 'embed' ? 'EMB' :
-                                                                                                 comp.type === 'quiz' ? 'QIZ' : comp.type.slice(0,3).toUpperCase()}
+                                                                                                    comp.type === 'video' ? 'VID' :
+                                                                                                        comp.type === 'embed' ? 'EMB' :
+                                                                                                            comp.type === 'quiz' ? 'QIZ' : comp.type.slice(0, 3).toUpperCase()}
                                                                                             </span>
                                                                                             <span className="truncate flex-1 font-medium text-slate-600">
                                                                                                 {comp.title || (comp.type === 'html'
@@ -1169,558 +1195,557 @@ export default function CourseOutlineEditor() {
                         </div>
                     </div>
                 ) : (
-                <main className="flex-1 bg-slate-50 overflow-y-auto">
-                    {selectedUnitData ? (
-                        <div className="max-w-4xl mx-auto p-8 pb-32">
-                            {/* Unit Header editable area */}
-                            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-6">
-                                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
-                                    <div className="flex flex-col">
-                                        <div className="flex items-center gap-2 text-emerald-600 text-xs font-bold uppercase tracking-wider mb-1">
-                                            <FileText size={14} />
-                                            Editing Unit
+                    <main className="flex-1 bg-slate-50 overflow-y-auto">
+                        {selectedUnitData ? (
+                            <div className="max-w-4xl mx-auto p-8 pb-32">
+                                {/* Unit Header editable area */}
+                                <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-6">
+                                    <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-2 text-emerald-600 text-xs font-bold uppercase tracking-wider mb-1">
+                                                <FileText size={14} />
+                                                Editing Unit
+                                            </div>
+                                            <div className="text-xs text-slate-400 font-mono">ID: {selectedUnitData.id}</div>
                                         </div>
-                                        <div className="text-xs text-slate-400 font-mono">ID: {selectedUnitData.id}</div>
-                                    </div>
-                                    <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-2">Visibility:</label>
-                                        <select
-                                            className="text-sm font-medium border border-slate-200 shadow-sm rounded px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                                            value={selectedUnitData.status}
-                                            onChange={(e) => {
-                                                const newSections = [...course.sections];
-                                                for (let i = 0; i < newSections.length; i++) {
-                                                    for (let j = 0; j < newSections[i].subsections.length; j++) {
-                                                        const unitIdx = newSections[i].subsections[j].units.findIndex(u => u.id === selectedUnitId);
-                                                        if (unitIdx > -1) {
-                                                            newSections[i].subsections[j].units[unitIdx].status = e.target.value as any;
-                                                            saveCourse({ ...course, sections: newSections });
-                                                            return;
+                                        <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-2">Visibility:</label>
+                                            <select
+                                                className="text-sm font-medium border border-slate-200 shadow-sm rounded px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                                                value={selectedUnitData.status}
+                                                onChange={(e) => {
+                                                    const newSections = [...course.sections];
+                                                    for (let i = 0; i < newSections.length; i++) {
+                                                        for (let j = 0; j < newSections[i].subsections.length; j++) {
+                                                            const unitIdx = newSections[i].subsections[j].units.findIndex(u => u.id === selectedUnitId);
+                                                            if (unitIdx > -1) {
+                                                                newSections[i].subsections[j].units[unitIdx].status = e.target.value as any;
+                                                                saveCourse({ ...course, sections: newSections });
+                                                                return;
+                                                            }
                                                         }
                                                     }
-                                                }
-                                            }}
-                                        >
-                                            <option value="draft">Draft (Hidden from students)</option>
-                                            <option value="published">Published (Visible)</option>
-                                        </select>
+                                                }}
+                                            >
+                                                <option value="draft">Draft (Hidden from students)</option>
+                                                <option value="published">Published (Visible)</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                </div>
-                                <input
-                                    type="text"
-                                    className="w-full text-3xl font-black text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 p-0 placeholder-slate-300"
-                                    value={selectedUnitData.title}
-                                    placeholder="Enter Unit Title here..."
-                                    onChange={(e) => {
-                                        const newSections = [...course.sections];
-                                        for (let i = 0; i < newSections.length; i++) {
-                                            for (let j = 0; j < newSections[i].subsections.length; j++) {
-                                                const unitIdx = newSections[i].subsections[j].units.findIndex(u => u.id === selectedUnitId);
-                                                if (unitIdx > -1) {
-                                                    newSections[i].subsections[j].units[unitIdx].title = e.target.value;
-                                                    saveCourse({ ...course, sections: newSections });
-                                                    return;
+                                    <input
+                                        type="text"
+                                        className="w-full text-3xl font-black text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 p-0 placeholder-slate-300"
+                                        value={selectedUnitData.title}
+                                        placeholder="Enter Unit Title here..."
+                                        onChange={(e) => {
+                                            const newSections = [...course.sections];
+                                            for (let i = 0; i < newSections.length; i++) {
+                                                for (let j = 0; j < newSections[i].subsections.length; j++) {
+                                                    const unitIdx = newSections[i].subsections[j].units.findIndex(u => u.id === selectedUnitId);
+                                                    if (unitIdx > -1) {
+                                                        newSections[i].subsections[j].units[unitIdx].title = e.target.value;
+                                                        saveCourse({ ...course, sections: newSections });
+                                                        return;
+                                                    }
                                                 }
                                             }
-                                        }
-                                    }}
-                                />
-                            </div>
+                                        }}
+                                    />
+                                </div>
 
-                            {/* Components list */}
-                            <div className="space-y-6 relative">
-                                {/* Visual vertical line connecting blocks */}
-                                <div className="absolute left-8 top-0 bottom-0 w-1 bg-slate-200/50 -z-10 rounded-full"></div>
+                                {/* Components list */}
+                                <div className="space-y-6 relative">
+                                    {/* Visual vertical line connecting blocks */}
+                                    <div className="absolute left-8 top-0 bottom-0 w-1 bg-slate-200/50 -z-10 rounded-full"></div>
 
-                                {selectedUnitData.components.length === 0 ? (
-                                    <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-16 text-center shadow-inner relative z-10">
-                                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400 shadow-sm border border-slate-100">
-                                            <Layers size={40} className="text-emerald-400" />
+                                    {selectedUnitData.components.length === 0 ? (
+                                        <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-16 text-center shadow-inner relative z-10">
+                                            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400 shadow-sm border border-slate-100">
+                                                <Layers size={40} className="text-emerald-400" />
+                                            </div>
+                                            <h3 className="text-xl font-bold text-slate-700 mb-2">Build Your Lesson</h3>
+                                            <p className="text-slate-500 text-sm mb-6 max-w-sm mx-auto">
+                                                Units are composed of stacked vertical blocks in Open edX. Add Markdown, Videos, or interactive Quizzes below to begin.
+                                            </p>
                                         </div>
-                                        <h3 className="text-xl font-bold text-slate-700 mb-2">Build Your Lesson</h3>
-                                        <p className="text-slate-500 text-sm mb-6 max-w-sm mx-auto">
-                                            Units are composed of stacked vertical blocks in Open edX. Add Markdown, Videos, or interactive Quizzes below to begin.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    selectedUnitData.components.map((comp, idx) => (
-                                        <div key={comp.id} className="bg-white border border-slate-200 rounded-xl shadow-sm relative z-10 focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500 transition-all">
-                                            {/* Block Header */}
-                                            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 font-mono text-xs font-bold shadow-sm">
-                                                        {idx + 1}
-                                                    </div>
-                                                    <span className={`text-xs font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border
+                                    ) : (
+                                        selectedUnitData.components.map((comp, idx) => (
+                                            <div key={comp.id} className="bg-white border border-slate-200 rounded-xl shadow-sm relative z-10 focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500 transition-all">
+                                                {/* Block Header */}
+                                                <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 font-mono text-xs font-bold shadow-sm">
+                                                            {idx + 1}
+                                                        </div>
+                                                        <span className={`text-xs font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border
                                                         ${comp.type === 'html' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
                                                         ${comp.type === 'video' ? 'bg-red-50 text-red-700 border-red-200' : ''}
                                                         ${comp.type === 'quiz' ? 'bg-purple-50 text-purple-700 border-purple-200' : ''}
                                                         ${comp.type === 'document' ? 'bg-amber-50 text-amber-700 border-amber-200' : ''}
                                                         ${comp.type === 'embed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}
                                                     `}>
-                                                        {comp.type} Component
-                                                    </span>
-                                                    <input
-                                                        type="text"
-                                                        value={comp.title}
-                                                        onChange={(e) => updateComponent(comp.id, { title: e.target.value })}
-                                                        placeholder="Component Title"
-                                                        className="font-semibold text-slate-900 text-sm bg-transparent border-none focus:outline-none focus:ring-0 p-0"
-                                                    />
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <div className="flex items-center border border-slate-200 rounded-md overflow-hidden bg-white shadow-sm mr-2">
-                                                        <button
-                                                            onClick={() => moveComponentLocation(comp.id, 'up')}
-                                                            disabled={idx === 0}
-                                                            className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors border-r border-slate-200"
-                                                            title="Move Up"
-                                                        >
-                                                            <ArrowUp size={14} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => moveComponentLocation(comp.id, 'down')}
-                                                            disabled={idx === selectedUnitData.components.length - 1}
-                                                            className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                                            title="Move Down"
-                                                        >
-                                                            <ArrowDown size={14} />
-                                                        </button>
+                                                            {comp.type} Component
+                                                        </span>
+                                                        <input
+                                                            type="text"
+                                                            value={comp.title}
+                                                            onChange={(e) => updateComponent(comp.id, { title: e.target.value })}
+                                                            placeholder="Component Title"
+                                                            className="font-semibold text-slate-900 text-sm bg-transparent border-none focus:outline-none focus:ring-0 p-0"
+                                                        />
                                                     </div>
-
-                                                    {/* Move to another Unit */}
-                                                    <select
-                                                        value=""
-                                                        onChange={(e) => {
-                                                            if (e.target.value) {
-                                                                moveComponentToUnit(comp.id, e.target.value);
-                                                            }
-                                                        }}
-                                                        className="text-[11px] font-medium border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-emerald-500 mr-2 shadow-sm max-w-[160px]"
-                                                        title="Move to another Unit"
-                                                    >
-                                                        <option value="">Move to...</option>
-                                                        {course.sections.map((sec, sIdx) =>
-                                                            sec.subsections.map((sub, ssIdx) =>
-                                                                sub.units
-                                                                    .filter(u => u.id !== selectedUnitId)
-                                                                    .map(u => (
-                                                                        <option key={u.id} value={u.id}>
-                                                                            {sec.title.slice(0,12)}... › {u.title.slice(0,20)}
-                                                                        </option>
-                                                                    ))
-                                                            )
-                                                        )}
-                                                    </select>
-                                                    
-                                                    <button
-                                                        onClick={() => toggleComponentCollapse(comp.id)}
-                                                        className="text-slate-400 hover:text-slate-600 transition-colors bg-white p-1.5 rounded-md border border-transparent hover:border-slate-200 hover:bg-slate-50 shadow-sm"
-                                                        title={collapsedComponents.has(comp.id) ? "Expand Component" : "Collapse Component"}
-                                                    >
-                                                        {collapsedComponents.has(comp.id) ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (confirm('Are you sure you want to delete this component?')) {
-                                                                deleteComponent(comp.id);
-                                                            }
-                                                        }}
-                                                        className="text-slate-400 hover:text-rose-500 transition-colors bg-white p-1.5 rounded-md border border-transparent hover:border-rose-200 hover:bg-rose-50 shadow-sm"
-                                                        title="Delete Component"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {/* Block Body Editor Forms */}
-                                            {!collapsedComponents.has(comp.id) && (
-                                                <div className="p-6">
-                                                {comp.type === 'html' && (
-                                                    <div className="flex flex-col gap-2 relative z-0">
-                                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Rich Text Content</label>
-                                                        <div className="border border-slate-200 rounded-lg overflow-hidden relative z-0">
-                                                            <RichTextEditorWrapper 
-                                                                value={comp.content}
-                                                                onChange={(newVal) => updateComponent(comp.id, { content: newVal })}
-                                                            />
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="flex items-center border border-slate-200 rounded-md overflow-hidden bg-white shadow-sm mr-2">
+                                                            <button
+                                                                onClick={() => moveComponentLocation(comp.id, 'up')}
+                                                                disabled={idx === 0}
+                                                                className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors border-r border-slate-200"
+                                                                title="Move Up"
+                                                            >
+                                                                <ArrowUp size={14} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => moveComponentLocation(comp.id, 'down')}
+                                                                disabled={idx === selectedUnitData.components.length - 1}
+                                                                className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                                                title="Move Down"
+                                                            >
+                                                                <ArrowDown size={14} />
+                                                            </button>
                                                         </div>
-                                                    </div>
-                                                )}
 
-                                                {comp.type === 'video' && (
-                                                    <div className="flex flex-col gap-4">
-                                                        {/* Video Source Type Detection */}
-                                                        {(() => {
-                                                            const url = comp.content || '';
-                                                            const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
-                                                            const isDirect = /\.(mp4|webm|ogg)(\?|$)/i.test(url);
-                                                            const isGDrive = url.includes('drive.google.com');
-                                                            const sourceType = isYouTube ? '🎬 YouTube' : isDirect ? '🎥 Direct Video File' : isGDrive ? '📁 Google Drive' : url ? '🔗 External URL' : '⏳ No video set';
+                                                        {/* Move to another Unit */}
+                                                        <select
+                                                            value=""
+                                                            onChange={(e) => {
+                                                                if (e.target.value) {
+                                                                    moveComponentToUnit(comp.id, e.target.value);
+                                                                }
+                                                            }}
+                                                            className="text-[11px] font-medium border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-emerald-500 mr-2 shadow-sm max-w-[160px]"
+                                                            title="Move to another Unit"
+                                                        >
+                                                            <option value="">Move to...</option>
+                                                            {course.sections.map((sec, sIdx) =>
+                                                                sec.subsections.map((sub, ssIdx) =>
+                                                                    sub.units
+                                                                        .filter(u => u.id !== selectedUnitId)
+                                                                        .map(u => (
+                                                                            <option key={u.id} value={u.id}>
+                                                                                {sec.title.slice(0, 12)}... › {u.title.slice(0, 20)}
+                                                                            </option>
+                                                                        ))
+                                                                )
+                                                            )}
+                                                        </select>
+
+                                                        <button
+                                                            onClick={() => toggleComponentCollapse(comp.id)}
+                                                            className="text-slate-400 hover:text-slate-600 transition-colors bg-white p-1.5 rounded-md border border-transparent hover:border-slate-200 hover:bg-slate-50 shadow-sm"
+                                                            title={collapsedComponents.has(comp.id) ? "Expand Component" : "Collapse Component"}
+                                                        >
+                                                            {collapsedComponents.has(comp.id) ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (confirm('Are you sure you want to delete this component?')) {
+                                                                    deleteComponent(comp.id);
+                                                                }
+                                                            }}
+                                                            className="text-slate-400 hover:text-rose-500 transition-colors bg-white p-1.5 rounded-md border border-transparent hover:border-rose-200 hover:bg-rose-50 shadow-sm"
+                                                            title="Delete Component"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Block Body Editor Forms */}
+                                                {!collapsedComponents.has(comp.id) && (
+                                                    <div className="p-6">
+                                                        {comp.type === 'html' && (
+                                                            <div className="flex flex-col gap-2 relative z-0">
+                                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Rich Text Content</label>
+                                                                <div className="border border-slate-200 rounded-lg overflow-hidden relative z-0">
+                                                                    <RichTextEditorWrapper
+                                                                        value={comp.content}
+                                                                        onChange={(newVal) => updateComponent(comp.id, { content: newVal })}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {comp.type === 'video' && (
+                                                            <div className="flex flex-col gap-4">
+                                                                {/* Video Source Type Detection */}
+                                                                {(() => {
+                                                                    const url = comp.content || '';
+                                                                    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+                                                                    const isDirect = /\.(mp4|webm|ogg)(\?|$)/i.test(url);
+                                                                    const isGDrive = url.includes('drive.google.com');
+                                                                    const sourceType = isYouTube ? '🎬 YouTube' : isDirect ? '🎥 Direct Video File' : isGDrive ? '📁 Google Drive' : url ? '🔗 External URL' : '⏳ No video set';
+                                                                    return (
+                                                                        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold ${isYouTube ? 'bg-red-50 text-red-700 border border-red-200' :
+                                                                            isDirect ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                                                                isGDrive ? 'bg-green-50 text-green-700 border border-green-200' :
+                                                                                    'bg-slate-50 text-slate-500 border border-slate-200'
+                                                                            }`}>
+                                                                            <span>{sourceType}</span>
+                                                                            {url && <span className="font-normal text-[10px] truncate max-w-[300px] opacity-70">{url}</span>}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+
+                                                                {/* Video URL Input */}
+                                                                <div className="flex flex-col gap-1.5">
+                                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Video URL</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-900 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                                                        value={comp.content}
+                                                                        onChange={(e) => updateComponent(comp.id, { content: e.target.value })}
+                                                                        placeholder="YouTube URL, .mp4/.webm link, or Google Drive share link"
+                                                                    />
+                                                                    <p className="text-[11px] text-slate-400">
+                                                                        Supports: YouTube URLs, direct .mp4/.ogg/.webm links, Google Drive shared videos
+                                                                    </p>
+                                                                </div>
+
+                                                                {/* Video ID */}
+                                                                <div className="flex flex-col gap-1.5">
+                                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Video ID <span className="font-normal text-slate-400">(Optional)</span></label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-900 focus:outline-none focus:border-slate-400"
+                                                                        value={comp.videoId || ''}
+                                                                        onChange={(e) => updateComponent(comp.id, { videoId: e.target.value })}
+                                                                        placeholder="e.g. abc123def"
+                                                                    />
+                                                                    <p className="text-[11px] text-slate-400">If assigned a video ID by edX, enter it here.</p>
+                                                                </div>
+
+                                                                {/* Fallback Videos */}
+                                                                <div className="flex flex-col gap-1.5">
+                                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fallback Videos <span className="font-normal text-slate-400">(Optional)</span></label>
+                                                                    {(comp.fallbackUrls || []).map((url, fIdx) => (
+                                                                        <div key={fIdx} className="flex gap-2">
+                                                                            <input
+                                                                                type="text"
+                                                                                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm text-slate-900 focus:outline-none focus:border-slate-400"
+                                                                                value={url}
+                                                                                onChange={(e) => {
+                                                                                    const updated = [...(comp.fallbackUrls || [])];
+                                                                                    updated[fIdx] = e.target.value;
+                                                                                    updateComponent(comp.id, { fallbackUrls: updated });
+                                                                                }}
+                                                                                placeholder=".mp4 or .webm URL"
+                                                                            />
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const updated = (comp.fallbackUrls || []).filter((_, i) => i !== fIdx);
+                                                                                    updateComponent(comp.id, { fallbackUrls: updated });
+                                                                                }}
+                                                                                className="text-red-400 hover:text-red-600 p-1 text-xs font-bold"
+                                                                            >✕</button>
+                                                                        </div>
+                                                                    ))}
+                                                                    <button
+                                                                        onClick={() => updateComponent(comp.id, { fallbackUrls: [...(comp.fallbackUrls || []), ''] })}
+                                                                        className="text-xs text-blue-600 hover:text-blue-700 font-bold self-start"
+                                                                    >+ Add fallback video</button>
+                                                                    <p className="text-[11px] text-slate-400">Provide .mp4 and .webm versions to ensure all learners can access the video.</p>
+                                                                </div>
+
+                                                                {/* Thumbnail */}
+                                                                <div className="flex flex-col gap-1.5">
+                                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Thumbnail URL <span className="font-normal text-slate-400">(Optional)</span></label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-900 focus:outline-none focus:border-slate-400"
+                                                                        value={comp.thumbnailUrl || ''}
+                                                                        onChange={(e) => updateComponent(comp.id, { thumbnailUrl: e.target.value })}
+                                                                        placeholder="https://example.com/thumbnail.jpg"
+                                                                    />
+                                                                    {comp.thumbnailUrl && (
+                                                                        <div className="mt-1 border border-slate-200 rounded-lg overflow-hidden w-40 h-24">
+                                                                            <img src={comp.thumbnailUrl} alt="Thumbnail preview" className="w-full h-full object-cover" />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Allow Download Toggle */}
+                                                                <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                                                    <div>
+                                                                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Allow Video Downloads</label>
+                                                                        <p className="text-[11px] text-slate-400 mt-0.5">Students can download the video file for offline viewing</p>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => updateComponent(comp.id, { allowDownload: !comp.allowDownload })}
+                                                                        className={`relative w-10 h-5 rounded-full transition-colors ${comp.allowDownload ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                                                    >
+                                                                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${comp.allowDownload ? 'translate-x-5' : 'translate-x-0.5'}`}></div>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {comp.type === 'embed' && (
+                                                            <div className="flex flex-col gap-2">
+                                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">External URL (iFrame Embed)</label>
+                                                                <input
+                                                                    type="text"
+                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                                                                    value={comp.content}
+                                                                    onChange={(e) => updateComponent(comp.id, { content: e.target.value })}
+                                                                    placeholder="https://docs.google.com/document/d/e/.../pub"
+                                                                />
+                                                                <p className="text-xs text-slate-400 mt-1">This URL will be embedded directly into the course page as an interactive iFrame.</p>
+                                                            </div>
+                                                        )}
+
+                                                        {comp.type === 'quiz' && (() => {
+                                                            // Quiz Source: 'library' or 'manual'
+                                                            const quizSource = comp.quizBankId ? 'library' : 'manual';
                                                             return (
-                                                                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold ${
-                                                                    isYouTube ? 'bg-red-50 text-red-700 border border-red-200' :
-                                                                    isDirect ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                                                                    isGDrive ? 'bg-green-50 text-green-700 border border-green-200' :
-                                                                    'bg-slate-50 text-slate-500 border border-slate-200'
-                                                                }`}>
-                                                                    <span>{sourceType}</span>
-                                                                    {url && <span className="font-normal text-[10px] truncate max-w-[300px] opacity-70">{url}</span>}
+                                                                <div className="flex flex-col gap-4">
+                                                                    {/* Source Toggle */}
+                                                                    <div className="flex gap-2 bg-slate-50 p-3 border-b border-slate-200 -mx-6 -mt-6 rounded-t-lg">
+                                                                        <button
+                                                                            className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${quizSource === 'library' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
+                                                                            onClick={() => {
+                                                                                if (!comp.quizBankId) updateComponent(comp.id, { quizBankId: '_pending', quizMode: 'all', content: '' });
+                                                                            }}
+                                                                        >📚 문제은행에서 가져오기</button>
+                                                                        <button
+                                                                            className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${quizSource === 'manual' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
+                                                                            onClick={() => updateComponent(comp.id, { quizBankId: undefined, quizMode: undefined, questionCount: undefined, selectedQuestionIds: undefined })}
+                                                                        >✏️ 직접 만들기</button>
+                                                                    </div>
+
+                                                                    {/* Library Mode */}
+                                                                    {quizSource === 'library' && (
+                                                                        <QuizBankPicker
+                                                                            comp={comp}
+                                                                            updateComponent={updateComponent}
+                                                                        />
+                                                                    )}
+
+                                                                    {/* Manual Mode */}
+                                                                    {quizSource === 'manual' && (
+                                                                        <div className="flex flex-col gap-2 bg-slate-50 p-6 border border-slate-200 rounded-lg">
+                                                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Interactive Problem Builder</label>
+                                                                            <QuizBuilder
+                                                                                initialContent={comp.content}
+                                                                                onChange={(newVal) => updateComponent(comp.id, { content: newVal })}
+                                                                            />
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Grading Configuration */}
+                                                                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4">
+                                                                        <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                                                            📊 채점 설정
+                                                                        </h4>
+                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                            {/* isGraded Toggle */}
+                                                                            <div className="flex items-center gap-3 bg-white rounded-lg border border-amber-100 p-3">
+                                                                                <button
+                                                                                    onClick={() => updateComponent(comp.id, { isGraded: !comp.isGraded })}
+                                                                                    className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${comp.isGraded ? 'bg-amber-500' : 'bg-slate-300'}`}
+                                                                                >
+                                                                                    <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${comp.isGraded ? 'translate-x-5' : 'translate-x-0'}`} />
+                                                                                </button>
+                                                                                <div>
+                                                                                    <span className="text-sm font-bold text-slate-800">{comp.isGraded ? '성적 반영' : '연습 모드'}</span>
+                                                                                    <p className="text-[10px] text-slate-400">{comp.isGraded ? '이 퀴즈 점수가 성적에 포함됩니다' : '점수가 성적에 반영되지 않습니다'}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Passing Score */}
+                                                                            {comp.isGraded && (
+                                                                                <div className="bg-white rounded-lg border border-amber-100 p-3">
+                                                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">통과 기준 점수 (%)</label>
+                                                                                    <div className="flex items-center gap-3">
+                                                                                        <input
+                                                                                            type="range" min="0" max="100" step="5"
+                                                                                            className="flex-1 accent-amber-500"
+                                                                                            value={comp.passingScore ?? 60}
+                                                                                            onChange={(e) => updateComponent(comp.id, { passingScore: parseInt(e.target.value) })}
+                                                                                        />
+                                                                                        <span className="text-lg font-bold text-amber-700 min-w-[3ch] text-right">{comp.passingScore ?? 60}%</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Open edX Metadata */}
+                                                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-slate-50 p-4 border border-slate-200 rounded-lg">
+                                                                        <div className="flex flex-col gap-1.5">
+                                                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Weight (Points)</label>
+                                                                            <input
+                                                                                type="number" min="0" step="0.5"
+                                                                                className="bg-white border border-slate-200 rounded p-2 text-sm text-slate-900 focus:outline-none focus:border-purple-500"
+                                                                                value={comp.weight !== undefined ? comp.weight : 1.0}
+                                                                                onChange={(e) => updateComponent(comp.id, { weight: parseFloat(e.target.value) || 0 })}
+                                                                            />
+                                                                        </div>
+                                                                        <div className="flex flex-col gap-1.5">
+                                                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Max Attempts</label>
+                                                                            <input
+                                                                                type="number" min="0" step="1"
+                                                                                className="bg-white border border-slate-200 rounded p-2 text-sm text-slate-900 focus:outline-none focus:border-purple-500"
+                                                                                value={comp.attempts !== undefined ? comp.attempts : 1}
+                                                                                onChange={(e) => updateComponent(comp.id, { attempts: parseInt(e.target.value, 10) || 0 })}
+                                                                                placeholder="0 = Unlimited"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="flex flex-col gap-1.5">
+                                                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Show Answer To Learners</label>
+                                                                            <select
+                                                                                className="bg-white border border-slate-200 rounded p-2 text-sm text-slate-900 focus:outline-none focus:border-purple-500"
+                                                                                value={comp.showAnswer || 'answered'}
+                                                                                onChange={(e) => updateComponent(comp.id, { showAnswer: e.target.value as any })}
+                                                                            >
+                                                                                <option value="always">Always</option>
+                                                                                <option value="answered">Answered</option>
+                                                                                <option value="attempted">Attempted</option>
+                                                                                <option value="never">Never</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             );
                                                         })()}
 
-                                                        {/* Video URL Input */}
-                                                        <div className="flex flex-col gap-1.5">
-                                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Video URL</label>
-                                                            <input
-                                                                type="text"
-                                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-900 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                                                                value={comp.content}
-                                                                onChange={(e) => updateComponent(comp.id, { content: e.target.value })}
-                                                                placeholder="YouTube URL, .mp4/.webm link, or Google Drive share link"
-                                                            />
-                                                            <p className="text-[11px] text-slate-400">
-                                                                Supports: YouTube URLs, direct .mp4/.ogg/.webm links, Google Drive shared videos
-                                                            </p>
-                                                        </div>
-
-                                                        {/* Video ID */}
-                                                        <div className="flex flex-col gap-1.5">
-                                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Video ID <span className="font-normal text-slate-400">(Optional)</span></label>
-                                                            <input
-                                                                type="text"
-                                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-900 focus:outline-none focus:border-slate-400"
-                                                                value={comp.videoId || ''}
-                                                                onChange={(e) => updateComponent(comp.id, { videoId: e.target.value })}
-                                                                placeholder="e.g. abc123def"
-                                                            />
-                                                            <p className="text-[11px] text-slate-400">If assigned a video ID by edX, enter it here.</p>
-                                                        </div>
-
-                                                        {/* Fallback Videos */}
-                                                        <div className="flex flex-col gap-1.5">
-                                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fallback Videos <span className="font-normal text-slate-400">(Optional)</span></label>
-                                                            {(comp.fallbackUrls || []).map((url, fIdx) => (
-                                                                <div key={fIdx} className="flex gap-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm text-slate-900 focus:outline-none focus:border-slate-400"
-                                                                        value={url}
-                                                                        onChange={(e) => {
-                                                                            const updated = [...(comp.fallbackUrls || [])];
-                                                                            updated[fIdx] = e.target.value;
-                                                                            updateComponent(comp.id, { fallbackUrls: updated });
-                                                                        }}
-                                                                        placeholder=".mp4 or .webm URL"
-                                                                    />
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const updated = (comp.fallbackUrls || []).filter((_, i) => i !== fIdx);
-                                                                            updateComponent(comp.id, { fallbackUrls: updated });
-                                                                        }}
-                                                                        className="text-red-400 hover:text-red-600 p-1 text-xs font-bold"
-                                                                    >✕</button>
-                                                                </div>
-                                                            ))}
-                                                            <button
-                                                                onClick={() => updateComponent(comp.id, { fallbackUrls: [...(comp.fallbackUrls || []), ''] })}
-                                                                className="text-xs text-blue-600 hover:text-blue-700 font-bold self-start"
-                                                            >+ Add fallback video</button>
-                                                            <p className="text-[11px] text-slate-400">Provide .mp4 and .webm versions to ensure all learners can access the video.</p>
-                                                        </div>
-
-                                                        {/* Thumbnail */}
-                                                        <div className="flex flex-col gap-1.5">
-                                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Thumbnail URL <span className="font-normal text-slate-400">(Optional)</span></label>
-                                                            <input
-                                                                type="text"
-                                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-900 focus:outline-none focus:border-slate-400"
-                                                                value={comp.thumbnailUrl || ''}
-                                                                onChange={(e) => updateComponent(comp.id, { thumbnailUrl: e.target.value })}
-                                                                placeholder="https://example.com/thumbnail.jpg"
-                                                            />
-                                                            {comp.thumbnailUrl && (
-                                                                <div className="mt-1 border border-slate-200 rounded-lg overflow-hidden w-40 h-24">
-                                                                    <img src={comp.thumbnailUrl} alt="Thumbnail preview" className="w-full h-full object-cover" />
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Allow Download Toggle */}
-                                                        <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
-                                                            <div>
-                                                                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Allow Video Downloads</label>
-                                                                <p className="text-[11px] text-slate-400 mt-0.5">Students can download the video file for offline viewing</p>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => updateComponent(comp.id, { allowDownload: !comp.allowDownload })}
-                                                                className={`relative w-10 h-5 rounded-full transition-colors ${comp.allowDownload ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                                                            >
-                                                                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${comp.allowDownload ? 'translate-x-5' : 'translate-x-0.5'}`}></div>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {comp.type === 'embed' && (
-                                                    <div className="flex flex-col gap-2">
-                                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">External URL (iFrame Embed)</label>
-                                                        <input
-                                                            type="text"
-                                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                                                            value={comp.content}
-                                                            onChange={(e) => updateComponent(comp.id, { content: e.target.value })}
-                                                            placeholder="https://docs.google.com/document/d/e/.../pub"
-                                                        />
-                                                        <p className="text-xs text-slate-400 mt-1">This URL will be embedded directly into the course page as an interactive iFrame.</p>
-                                                    </div>
-                                                )}
-
-                                                {comp.type === 'quiz' && (() => {
-                                                    // Quiz Source: 'library' or 'manual'
-                                                    const quizSource = comp.quizBankId ? 'library' : 'manual';
-                                                    return (
-                                                    <div className="flex flex-col gap-4">
-                                                        {/* Source Toggle */}
-                                                        <div className="flex gap-2 bg-slate-50 p-3 border-b border-slate-200 -mx-6 -mt-6 rounded-t-lg">
-                                                            <button
-                                                                className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${quizSource === 'library' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
-                                                                onClick={() => {
-                                                                    if (!comp.quizBankId) updateComponent(comp.id, { quizBankId: '_pending', quizMode: 'all', content: '' });
-                                                                }}
-                                                            >📚 문제은행에서 가져오기</button>
-                                                            <button
-                                                                className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${quizSource === 'manual' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
-                                                                onClick={() => updateComponent(comp.id, { quizBankId: undefined, quizMode: undefined, questionCount: undefined, selectedQuestionIds: undefined })}
-                                                            >✏️ 직접 만들기</button>
-                                                        </div>
-
-                                                        {/* Library Mode */}
-                                                        {quizSource === 'library' && (
-                                                            <QuizBankPicker
-                                                                comp={comp}
-                                                                updateComponent={updateComponent}
-                                                            />
-                                                        )}
-
-                                                        {/* Manual Mode */}
-                                                        {quizSource === 'manual' && (
-                                                            <div className="flex flex-col gap-2 bg-slate-50 p-6 border border-slate-200 rounded-lg">
-                                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Interactive Problem Builder</label>
-                                                                <QuizBuilder 
-                                                                    initialContent={comp.content} 
-                                                                    onChange={(newVal) => updateComponent(comp.id, { content: newVal })}
-                                                                />
-                                                            </div>
-                                                        )}
-
-                                                        {/* Grading Configuration */}
-                                                        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4">
-                                                            <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                                                                📊 채점 설정
-                                                            </h4>
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                                {/* isGraded Toggle */}
-                                                                <div className="flex items-center gap-3 bg-white rounded-lg border border-amber-100 p-3">
-                                                                    <button
-                                                                        onClick={() => updateComponent(comp.id, { isGraded: !comp.isGraded })}
-                                                                        className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${comp.isGraded ? 'bg-amber-500' : 'bg-slate-300'}`}
-                                                                    >
-                                                                        <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${comp.isGraded ? 'translate-x-5' : 'translate-x-0'}`} />
-                                                                    </button>
-                                                                    <div>
-                                                                        <span className="text-sm font-bold text-slate-800">{comp.isGraded ? '성적 반영' : '연습 모드'}</span>
-                                                                        <p className="text-[10px] text-slate-400">{comp.isGraded ? '이 퀴즈 점수가 성적에 포함됩니다' : '점수가 성적에 반영되지 않습니다'}</p>
+                                                        {comp.type === 'document' && (
+                                                            <div className="flex flex-col gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Attached File</label>
+                                                                {comp.content ? (
+                                                                    <div className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-md shadow-sm">
+                                                                        <div className="flex items-center gap-3 truncate pr-4">
+                                                                            <div className="w-10 h-10 bg-red-50 text-red-500 rounded flex items-center justify-center shrink-0">
+                                                                                <FileText size={20} />
+                                                                            </div>
+                                                                            <div className="flex flex-col truncate">
+                                                                                <span className="text-sm font-semibold text-slate-700 truncate">{comp.content.split('/').pop()}</span>
+                                                                                <span className="text-xs text-slate-400 truncate hover:text-blue-500 cursor-pointer" onClick={() => window.open(comp.content, '_blank')}>
+                                                                                    {comp.content}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => setShowAssetLibrary({ isOpen: true, targetCompId: comp.id })}
+                                                                            className="shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded text-xs font-bold transition-colors"
+                                                                        >
+                                                                            Change File
+                                                                        </button>
                                                                     </div>
-                                                                </div>
-                                                                {/* Passing Score */}
-                                                                {comp.isGraded && (
-                                                                    <div className="bg-white rounded-lg border border-amber-100 p-3">
-                                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">통과 기준 점수 (%)</label>
-                                                                        <div className="flex items-center gap-3">
+                                                                ) : (
+                                                                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-8 bg-white text-center">
+                                                                        <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-3">
+                                                                            <Upload size={20} />
+                                                                        </div>
+                                                                        <p className="text-sm font-semibold text-slate-700 mb-1">No document selected</p>
+                                                                        <p className="text-xs text-slate-500 mb-4">Upload a PDF or document from your shared library.</p>
+                                                                        <button
+                                                                            onClick={() => setShowAssetLibrary({ isOpen: true, targetCompId: comp.id })}
+                                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded shadow-sm text-sm transition-colors flex items-center gap-2"
+                                                                        >
+                                                                            <Layers size={16} /> Browse Library
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+
+                                                                {comp.content && (
+                                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                                                        <div className="flex flex-col gap-1.5">
+                                                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Description / Note</label>
                                                                             <input
-                                                                                type="range" min="0" max="100" step="5"
-                                                                                className="flex-1 accent-amber-500"
-                                                                                value={comp.passingScore ?? 60}
-                                                                                onChange={(e) => updateComponent(comp.id, { passingScore: parseInt(e.target.value) })}
+                                                                                type="text"
+                                                                                className="w-full bg-white border border-slate-200 rounded p-2 text-sm text-slate-900 focus:outline-none focus:border-amber-500"
+                                                                                value={comp.description || ''}
+                                                                                onChange={(e) => updateComponent(comp.id, { description: e.target.value })}
+                                                                                placeholder="e.g. Please read chapter 4 before class..."
                                                                             />
-                                                                            <span className="text-lg font-bold text-amber-700 min-w-[3ch] text-right">{comp.passingScore ?? 60}%</span>
+                                                                        </div>
+                                                                        <div className="flex flex-col gap-1.5">
+                                                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Display Mode</label>
+                                                                            <select
+                                                                                className="w-full bg-white border border-slate-200 rounded p-2 text-sm text-slate-900 focus:outline-none focus:border-amber-500"
+                                                                                value={comp.displayMode || 'link'}
+                                                                                onChange={(e) => updateComponent(comp.id, { displayMode: e.target.value as any })}
+                                                                            >
+                                                                                <option value="link">Download Link (Default)</option>
+                                                                                <option value="iframe">Embedded iFrame Player</option>
+                                                                            </select>
                                                                         </div>
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                        </div>
-
-                                                        {/* Open edX Metadata */}
-                                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-slate-50 p-4 border border-slate-200 rounded-lg">
-                                                            <div className="flex flex-col gap-1.5">
-                                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Weight (Points)</label>
-                                                                <input
-                                                                    type="number" min="0" step="0.5"
-                                                                    className="bg-white border border-slate-200 rounded p-2 text-sm text-slate-900 focus:outline-none focus:border-purple-500"
-                                                                    value={comp.weight !== undefined ? comp.weight : 1.0}
-                                                                    onChange={(e) => updateComponent(comp.id, { weight: parseFloat(e.target.value) || 0 })}
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1.5">
-                                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Max Attempts</label>
-                                                                <input
-                                                                    type="number" min="0" step="1"
-                                                                    className="bg-white border border-slate-200 rounded p-2 text-sm text-slate-900 focus:outline-none focus:border-purple-500"
-                                                                    value={comp.attempts !== undefined ? comp.attempts : 1}
-                                                                    onChange={(e) => updateComponent(comp.id, { attempts: parseInt(e.target.value, 10) || 0 })}
-                                                                    placeholder="0 = Unlimited"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1.5">
-                                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Show Answer To Learners</label>
-                                                                <select
-                                                                    className="bg-white border border-slate-200 rounded p-2 text-sm text-slate-900 focus:outline-none focus:border-purple-500"
-                                                                    value={comp.showAnswer || 'answered'}
-                                                                    onChange={(e) => updateComponent(comp.id, { showAnswer: e.target.value as any })}
-                                                                >
-                                                                    <option value="always">Always</option>
-                                                                    <option value="answered">Answered</option>
-                                                                    <option value="attempted">Attempted</option>
-                                                                    <option value="never">Never</option>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    );
-                                                })()}
-
-                                                {comp.type === 'document' && (
-                                                    <div className="flex flex-col gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Attached File</label>
-                                                        {comp.content ? (
-                                                            <div className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-md shadow-sm">
-                                                                <div className="flex items-center gap-3 truncate pr-4">
-                                                                    <div className="w-10 h-10 bg-red-50 text-red-500 rounded flex items-center justify-center shrink-0">
-                                                                        <FileText size={20} />
-                                                                    </div>
-                                                                    <div className="flex flex-col truncate">
-                                                                        <span className="text-sm font-semibold text-slate-700 truncate">{comp.content.split('/').pop()}</span>
-                                                                        <span className="text-xs text-slate-400 truncate hover:text-blue-500 cursor-pointer" onClick={() => window.open(comp.content, '_blank')}>
-                                                                            {comp.content}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                                <button 
-                                                                    onClick={() => setShowAssetLibrary({isOpen: true, targetCompId: comp.id})}
-                                                                    className="shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded text-xs font-bold transition-colors"
-                                                                >
-                                                                    Change File
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-8 bg-white text-center">
-                                                                <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-3">
-                                                                    <Upload size={20} />
-                                                                </div>
-                                                                <p className="text-sm font-semibold text-slate-700 mb-1">No document selected</p>
-                                                                <p className="text-xs text-slate-500 mb-4">Upload a PDF or document from your shared library.</p>
-                                                                <button
-                                                                    onClick={() => setShowAssetLibrary({isOpen: true, targetCompId: comp.id})}
-                                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded shadow-sm text-sm transition-colors flex items-center gap-2"
-                                                                >
-                                                                    <Layers size={16} /> Browse Library
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {comp.content && (
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                                                                <div className="flex flex-col gap-1.5">
-                                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Description / Note</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        className="w-full bg-white border border-slate-200 rounded p-2 text-sm text-slate-900 focus:outline-none focus:border-amber-500"
-                                                                        value={comp.description || ''}
-                                                                        onChange={(e) => updateComponent(comp.id, { description: e.target.value })}
-                                                                        placeholder="e.g. Please read chapter 4 before class..."
-                                                                    />
-                                                                </div>
-                                                                <div className="flex flex-col gap-1.5">
-                                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Display Mode</label>
-                                                                    <select
-                                                                        className="w-full bg-white border border-slate-200 rounded p-2 text-sm text-slate-900 focus:outline-none focus:border-amber-500"
-                                                                        value={comp.displayMode || 'link'}
-                                                                        onChange={(e) => updateComponent(comp.id, { displayMode: e.target.value as any })}
-                                                                    >
-                                                                        <option value="link">Download Link (Default)</option>
-                                                                        <option value="iframe">Embedded iFrame Player</option>
-                                                                    </select>
-                                                                </div>
-                                                            </div>
                                                         )}
                                                     </div>
                                                 )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))
-                                )}
+                                            </div>
+                                        ))
+                                    )}
 
-                                {/* Add Component Action Bar */}
-                                <div className="pt-6 flex justify-center gap-3 relative z-10">
-                                    <button
-                                        onClick={() => addComponent('html')}
-                                        className="bg-white border-2 border-slate-200 hover:border-blue-500 hover:text-blue-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
-                                    >
-                                        <Plus size={18} /> HTML Text
-                                    </button>
-                                    <button
-                                        onClick={() => addComponent('video')}
-                                        className="bg-white border-2 border-slate-200 hover:border-red-500 hover:text-red-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
-                                    >
-                                        <Plus size={18} /> Video
-                                    </button>
-                                    <button
-                                        onClick={() => addComponent('quiz')}
-                                        className="bg-white border-2 border-slate-200 hover:border-purple-500 hover:text-purple-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
-                                    >
-                                        <Plus size={18} /> Problem (Quiz)
-                                    </button>
-                                    <button
-                                        onClick={() => addComponent('document')}
-                                        className="bg-white border-2 border-slate-200 hover:border-amber-500 hover:text-amber-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
-                                    >
-                                        <Plus size={18} /> File
-                                    </button>
-                                    <button
-                                        onClick={() => addComponent('embed')}
-                                        className="bg-white border-2 border-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
-                                    >
-                                        <Globe size={18} /> Embed URL
-                                    </button>
+                                    {/* Add Component Action Bar */}
+                                    <div className="pt-6 flex justify-center gap-3 relative z-10">
+                                        <button
+                                            onClick={() => addComponent('html')}
+                                            className="bg-white border-2 border-slate-200 hover:border-blue-500 hover:text-blue-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
+                                        >
+                                            <Plus size={18} /> HTML Text
+                                        </button>
+                                        <button
+                                            onClick={() => addComponent('video')}
+                                            className="bg-white border-2 border-slate-200 hover:border-red-500 hover:text-red-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
+                                        >
+                                            <Plus size={18} /> Video
+                                        </button>
+                                        <button
+                                            onClick={() => addComponent('quiz')}
+                                            className="bg-white border-2 border-slate-200 hover:border-purple-500 hover:text-purple-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
+                                        >
+                                            <Plus size={18} /> Problem (Quiz)
+                                        </button>
+                                        <button
+                                            onClick={() => addComponent('document')}
+                                            className="bg-white border-2 border-slate-200 hover:border-amber-500 hover:text-amber-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
+                                        >
+                                            <Plus size={18} /> File
+                                        </button>
+                                        <button
+                                            onClick={() => addComponent('embed')}
+                                            className="bg-white border-2 border-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
+                                        >
+                                            <Globe size={18} /> Embed URL
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
 
-                        </div>
-                    ) : (
-                        <div className="h-full flex items-center justify-center text-slate-400 flex-col gap-4">
-                            <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center">
-                                <BookOpen size={48} className="text-slate-300" />
                             </div>
-                            <p className="font-medium text-slate-500">Select a Unit directly from the Outline sidebar to start editing.</p>
-                        </div>
-                    )}
-                </main>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-slate-400 flex-col gap-4">
+                                <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center">
+                                    <BookOpen size={48} className="text-slate-300" />
+                                </div>
+                                <p className="font-medium text-slate-500">Select a Unit directly from the Outline sidebar to start editing.</p>
+                            </div>
+                        )}
+                    </main>
                 )}
             </div>
 
             {/* Asset Library Modal Overlay */}
             {showAssetLibrary.isOpen && (
-                <MediaLibrarySelector 
-                    onClose={() => setShowAssetLibrary({isOpen: false, targetCompId: null})}
+                <MediaLibrarySelector
+                    onClose={() => setShowAssetLibrary({ isOpen: false, targetCompId: null })}
                     onSelectOption={(url) => {
                         if (showAssetLibrary.targetCompId) {
                             updateComponent(showAssetLibrary.targetCompId, { content: url });
                         }
-                        setShowAssetLibrary({isOpen: false, targetCompId: null});
+                        setShowAssetLibrary({ isOpen: false, targetCompId: null });
                     }}
                 />
             )}
@@ -1742,7 +1767,7 @@ export default function CourseOutlineEditor() {
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Publish Status</label>
                                 <p className="text-xs text-slate-400 mb-3">Controls the master visibility of this course.</p>
-                                <select 
+                                <select
                                     className="w-full bg-white border border-slate-200 rounded-lg p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 mb-6"
                                     value={course.status}
                                     onChange={(e) => saveCourse({ ...course, status: e.target.value as any })}
@@ -1756,8 +1781,8 @@ export default function CourseOutlineEditor() {
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Publish Schedule (KST)</label>
                                 <p className="text-xs text-slate-400 mb-3">Set the date and time when this course becomes visible to students.</p>
-                                <input 
-                                    type="datetime-local" 
+                                <input
+                                    type="datetime-local"
                                     className="w-full bg-white border border-slate-200 rounded-lg p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500"
                                     value={course.publishDate || ''}
                                     onChange={(e) => saveCourse({ ...course, publishDate: e.target.value })}
@@ -1797,34 +1822,34 @@ export default function CourseOutlineEditor() {
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Visibility</label>
                                 <div className="flex gap-4">
                                     <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="radio" 
-                                            name="visibility" 
+                                        <input
+                                            type="radio"
+                                            name="visibility"
                                             value="public"
                                             checked={!course.visibility || course.visibility === 'public'}
-                                            onChange={() => saveCourse({...course, visibility: 'public'})}
+                                            onChange={() => saveCourse({ ...course, visibility: 'public' })}
                                             className="text-emerald-500 focus:ring-emerald-500"
                                         />
                                         <span className="text-sm font-semibold text-slate-700">Public (All Users)</span>
                                     </label>
                                     <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="radio" 
-                                            name="visibility" 
+                                        <input
+                                            type="radio"
+                                            name="visibility"
                                             value="cohort"
                                             checked={course.visibility === 'cohort'}
-                                            onChange={() => saveCourse({...course, visibility: 'cohort'})}
+                                            onChange={() => saveCourse({ ...course, visibility: 'cohort' })}
                                             className="text-emerald-500 focus:ring-emerald-500"
                                         />
                                         <span className="text-sm font-semibold text-slate-700">Restricted (Cohorts)</span>
                                     </label>
                                     <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="radio" 
-                                            name="visibility" 
+                                        <input
+                                            type="radio"
+                                            name="visibility"
                                             value="none"
                                             checked={course.visibility === 'none'}
-                                            onChange={() => saveCourse({...course, visibility: 'none'})}
+                                            onChange={() => saveCourse({ ...course, visibility: 'none' })}
                                             className="text-emerald-500 focus:ring-emerald-500"
                                         />
                                         <span className="text-sm font-semibold text-slate-700">None (Hidden)</span>
@@ -1841,7 +1866,7 @@ export default function CourseOutlineEditor() {
                                                 {(course.allowedCohorts || []).length} Selected
                                             </span>
                                         </div>
-                                        
+
                                         <div className="flex flex-wrap gap-2 mb-4">
                                             {course.allowedCohorts && course.allowedCohorts.length > 0 ? (
                                                 course.allowedCohorts.map(code => (
@@ -1850,10 +1875,10 @@ export default function CourseOutlineEditor() {
                                                             {allPrograms.find(p => p.id === allCohorts.find(c => c.id === code)?.program_id)?.name || 'N/A'} »
                                                         </span>
                                                         {allCohorts.find(c => c.id === code)?.name || code}
-                                                        <button 
+                                                        <button
                                                             onClick={() => {
                                                                 const newCodes = (course.allowedCohorts || []).filter(c => c !== code);
-                                                                saveCourse({...course, allowedCohorts: newCodes});
+                                                                saveCourse({ ...course, allowedCohorts: newCodes });
                                                             }}
                                                             className="text-slate-400 hover:text-red-500 transition-colors ml-1"
                                                         >
@@ -1865,13 +1890,13 @@ export default function CourseOutlineEditor() {
                                                 <span className="text-xs text-slate-400 italic">No cohorts selected. This course will be invisible to students.</span>
                                             )}
                                         </div>
-                                        
+
                                         <div className="relative mb-4">
                                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                                                 <Search size={16} />
                                             </div>
-                                            <input 
-                                                type="text" 
+                                            <input
+                                                type="text"
                                                 className="w-full bg-white border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 text-sm text-slate-700 focus:outline-none focus:border-emerald-500"
                                                 placeholder="Search programs or cohorts..."
                                                 value={cohortSearch}
@@ -1882,15 +1907,15 @@ export default function CourseOutlineEditor() {
                                         <div className="max-h-64 overflow-y-auto custom-scrollbar border border-slate-200 rounded-lg bg-white">
                                             {allPrograms.map(program => {
                                                 const cohortsInProgram = allCohorts.filter(c => c.program_id === program.id);
-                                                const displayedCohorts = cohortsInProgram.filter(c => 
-                                                    !cohortSearch || 
-                                                    c.name.toLowerCase().includes(cohortSearch.toLowerCase()) || 
+                                                const displayedCohorts = cohortsInProgram.filter(c =>
+                                                    !cohortSearch ||
+                                                    c.name.toLowerCase().includes(cohortSearch.toLowerCase()) ||
                                                     program.name.toLowerCase().includes(cohortSearch.toLowerCase())
                                                 );
 
                                                 if (cohortSearch && displayedCohorts.length === 0 && !program.name.toLowerCase().includes(cohortSearch.toLowerCase())) return null;
 
-                                                const selectedInProgram = (course.allowedCohorts || []).filter(code => 
+                                                const selectedInProgram = (course.allowedCohorts || []).filter(code =>
                                                     cohortsInProgram.some(c => c.id === code)
                                                 );
                                                 const isAllSelected = cohortsInProgram.length > 0 && selectedInProgram.length === cohortsInProgram.length;
@@ -1902,7 +1927,7 @@ export default function CourseOutlineEditor() {
                                                                 <Layers size={14} className="text-slate-400" />
                                                                 <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">{program.name}</span>
                                                             </div>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => {
                                                                     const current = course.allowedCohorts || [];
                                                                     let next;
@@ -1914,13 +1939,12 @@ export default function CourseOutlineEditor() {
                                                                         const toAdd = cohortsInProgram.map(c => c.id).filter(id => !current.includes(id));
                                                                         next = [...current, ...toAdd];
                                                                     }
-                                                                    saveCourse({...course, allowedCohorts: next});
+                                                                    saveCourse({ ...course, allowedCohorts: next });
                                                                 }}
-                                                                className={`text-[10px] font-bold px-2 py-0.5 rounded transition-all ${
-                                                                    isAllSelected 
-                                                                    ? 'bg-red-50 text-red-600 hover:bg-red-100' 
+                                                                className={`text-[10px] font-bold px-2 py-0.5 rounded transition-all ${isAllSelected
+                                                                    ? 'bg-red-50 text-red-600 hover:bg-red-100'
                                                                     : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                                                                }`}
+                                                                    }`}
                                                             >
                                                                 {isAllSelected ? "Deselect Program" : "Select Program"}
                                                             </button>
@@ -1933,16 +1957,15 @@ export default function CourseOutlineEditor() {
                                                                         key={cohort.id}
                                                                         onClick={() => {
                                                                             const current = course.allowedCohorts || [];
-                                                                            const next = isSelected 
+                                                                            const next = isSelected
                                                                                 ? current.filter(c => c !== cohort.id)
                                                                                 : [...current, cohort.id];
-                                                                            saveCourse({...course, allowedCohorts: next});
+                                                                            saveCourse({ ...course, allowedCohorts: next });
                                                                         }}
-                                                                        className={`flex items-center justify-between p-2 rounded-md text-xs transition-colors ${
-                                                                            isSelected 
-                                                                            ? 'bg-emerald-50 text-emerald-700 font-bold' 
+                                                                        className={`flex items-center justify-between p-2 rounded-md text-xs transition-colors ${isSelected
+                                                                            ? 'bg-emerald-50 text-emerald-700 font-bold'
                                                                             : 'hover:bg-slate-50 text-slate-600'
-                                                                        }`}
+                                                                            }`}
                                                                     >
                                                                         <span>{cohort.name}</span>
                                                                         {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>}
@@ -1960,10 +1983,30 @@ export default function CourseOutlineEditor() {
                                     </div>
                                 </div>
                             )}
-                            
+
+                            {/* Lecturer Assignment (Superuser/Staff ONLY) */}
+                            {userRole !== 'lecturer' && (
+                                <div className="pt-4 border-t border-slate-100 mt-4">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                        Assigned Lecturers (Emails)
+                                    </label>
+                                    <div className="text-[10px] text-slate-500 mb-2">
+                                        Enter email addresses separated by commas. These users (if they hold the 'lecturer' role) will be granted CMS edit access to this course.
+                                    </div>
+                                    <textarea
+                                        className="w-full border text-left border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white placeholder-slate-400 min-h-[60px]"
+                                        placeholder="e.g. lecturer1@ex.com, teacher@school.edu"
+                                        value={(course.lecturers || []).join(', ')}
+                                        onChange={(e) => {
+                                            const emails = e.target.value.split(',').map(email => email.trim()).filter(email => email.length > 0);
+                                            saveCourse({ ...course, lecturers: emails });
+                                        }}
+                                    />
+                                </div>
+                            )}
                         </div>
                         <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
-                            <button 
+                            <button
                                 onClick={() => setShowCourseSettings(false)}
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-8 rounded-xl shadow-sm transition-colors"
                             >
@@ -2024,7 +2067,7 @@ export default function CourseOutlineEditor() {
                                         <option value="none">None (Completely removed)</option>
                                     </select>
                                 </div>
-                                
+
                                 {targetNode.status === 'scheduled' && (
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Publish Date & Time (KST)</label>

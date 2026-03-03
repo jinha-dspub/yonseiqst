@@ -21,6 +21,7 @@ export default function CMSDashboard() {
     const [courses, setCourses] = useState<Course[]>([]);
     const [mounted, setMounted] = useState(false);
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [userEmail, setUserEmail] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'courses' | 'library'>('courses');
 
     // Modal states
@@ -45,7 +46,7 @@ export default function CMSDashboard() {
         const checkAuth = async () => {
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
-            
+
             if (!user) {
                 router.push(`/${locale}`);
                 return;
@@ -53,28 +54,29 @@ export default function CMSDashboard() {
 
             const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
             const role = userData?.role || "student";
-            
+
             if (role === 'student') {
                 router.push(`/${locale}/dashboard`);
                 return;
             }
 
             setUserRole(role);
+            setUserEmail(user.email || '');
             setMounted(true);
 
             // Once authorized, load courses
-            const dbCourses = await getCourses();
+            let dbCourses = await getCourses();
+
+            if (role === 'lecturer') {
+                dbCourses = dbCourses.filter(c => c.lecturers && c.lecturers.includes(user.email!));
+            }
+
             if (dbCourses.length > 0) {
                 setCourses(dbCourses);
                 localStorage.setItem('lms_courses_db', JSON.stringify(dbCourses));
             } else {
-                const saved = localStorage.getItem('lms_courses_db');
-                const initial: Course[] = saved ? JSON.parse(saved) : [getMockCourse()];
-                setCourses(initial);
-                for (const c of initial) {
-                    await saveCourseToDb(c);
-                }
-                localStorage.setItem('lms_courses_db', JSON.stringify(initial));
+                setCourses([]);
+                localStorage.setItem('lms_courses_db', JSON.stringify([]));
             }
         };
         checkAuth();
@@ -87,6 +89,8 @@ export default function CMSDashboard() {
 
     const handleAddCourse = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (userRole === 'lecturer') return;
 
         let newId = `course_${Date.now()}`;
         if (courseFormData.organization && courseFormData.courseNumber && courseFormData.courseRun) {
@@ -106,6 +110,7 @@ export default function CMSDashboard() {
             thumbnail: courseFormData.thumbnail || undefined,
             sections: [],
             status: "draft",
+            lecturers: []
         };
         const updatedCourses = [...courses, newCourse];
         setCourses(updatedCourses);
@@ -144,6 +149,8 @@ export default function CMSDashboard() {
     };
 
     const handleDeleteCourse = async (courseId: string) => {
+        if (userRole === 'lecturer') return;
+
         if (deleteCreds.username !== 'jinha' || deleteCreds.password !== 'j2data2025') {
             setDeleteError('Invalid username or password.');
             return;
@@ -190,6 +197,9 @@ export default function CMSDashboard() {
                 <div className="flex items-center gap-3 text-emerald-600">
                     <BookOpen size={24} />
                     <h1 className="text-xl font-bold tracking-tight">{t('CMS.header_title')} <span className="text-sm font-normal text-slate-400">by CodeInit</span></h1>
+                    {userRole === 'lecturer' && (
+                        <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wider">Lecturer</span>
+                    )}
                 </div>
                 <div className="flex items-center gap-6">
                     <LanguageSwitcher />
@@ -231,56 +241,68 @@ export default function CMSDashboard() {
                                 <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('CMS.my_courses')}</h2>
                                 <p className="text-slate-500 mt-1 text-sm">{t('CMS.my_courses_desc')}</p>
                             </div>
-                            <button
-                                onClick={openCreateModal}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
-                            >
-                                <Plus size={16} />
-                                {t('CMS.new_course')}
-                            </button>
+                            {userRole !== 'lecturer' && (
+                                <button
+                                    onClick={openCreateModal}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+                                >
+                                    <Plus size={16} />
+                                    {t('CMS.new_course')}
+                                </button>
+                            )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {courses.map(course => (
-                                <div key={course.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition-all group flex flex-col h-full">
-                                    <div
-                                        className={`h-32 border-b border-slate-200 flex items-center justify-center relative ${course.thumbnail ? 'bg-cover bg-center' : 'bg-slate-100 text-slate-300'}`}
-                                        style={course.thumbnail ? { backgroundImage: `url(${course.thumbnail})` } : {}}
-                                    >
-                                        {course.thumbnail && <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />}
-                                        {!course.thumbnail && <BookOpen size={48} className="opacity-20 group-hover:scale-110 transition-transform duration-300 relative z-10" />}
+                        {courses.length === 0 ? (
+                            <div className="text-center py-20 bg-white border border-slate-200 rounded-xl shadow-sm">
+                                <BookOpen size={48} className="mx-auto text-slate-300 mb-4" />
+                                <h3 className="text-lg font-bold text-slate-800 mb-2">No Courses Found</h3>
+                                <p className="text-slate-500 text-sm">
+                                    {userRole === 'lecturer' ? "You have not been assigned as a lecturer to any courses yet." : "Create your first course to get started!"}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {courses.map(course => (
+                                    <div key={course.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition-all group flex flex-col h-full">
+                                        <div
+                                            className={`h-32 border-b border-slate-200 flex items-center justify-center relative ${course.thumbnail ? 'bg-cover bg-center' : 'bg-slate-100 text-slate-300'}`}
+                                            style={course.thumbnail ? { backgroundImage: `url(${course.thumbnail})` } : {}}
+                                        >
+                                            {course.thumbnail && <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />}
+                                            {!course.thumbnail && <BookOpen size={48} className="opacity-20 group-hover:scale-110 transition-transform duration-300 relative z-10" />}
 
-                                        <div className="absolute top-3 right-3 flex gap-2 z-20">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    openEditModal(course);
-                                                }}
-                                                className="w-8 h-8 rounded-full bg-white/80 hover:bg-white text-slate-600 flex items-center justify-center shadow-sm backdrop-blur-sm transition-colors"
-                                                title={t('Modal.edit_title')}
-                                            >
-                                                <Settings size={14} />
-                                            </button>
+                                            <div className="absolute top-3 right-3 flex gap-2 z-20">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        openEditModal(course);
+                                                    }}
+                                                    className="w-8 h-8 rounded-full bg-white/80 hover:bg-white text-slate-600 flex items-center justify-center shadow-sm backdrop-blur-sm transition-colors"
+                                                    title={t('Modal.edit_title')}
+                                                >
+                                                    <Settings size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="p-5 flex-1 flex flex-col">
+                                            <h3 className="font-bold text-lg text-slate-900 mb-1">{course.title}</h3>
+                                            <p className="text-sm text-slate-500 line-clamp-2 mb-6 flex-1">{course.description}</p>
+                                            <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto">
+                                                <span className={`text-[10px] px-2 py-1 rounded-md font-bold uppercase tracking-wider ${course.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                    {course.status}
+                                                </span>
+                                                <Link
+                                                    href={`/${locale}/cms/course/${course.id}`}
+                                                    className="text-emerald-600 hover:text-emerald-700 text-sm font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform"
+                                                >
+                                                    {t('CMS.edit_outline')} <span aria-hidden="true">&rarr;</span>
+                                                </Link>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="p-5 flex-1 flex flex-col">
-                                        <h3 className="font-bold text-lg text-slate-900 mb-1">{course.title}</h3>
-                                        <p className="text-sm text-slate-500 line-clamp-2 mb-6 flex-1">{course.description}</p>
-                                        <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto">
-                                            <span className={`text-[10px] px-2 py-1 rounded-md font-bold uppercase tracking-wider ${course.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                {course.status}
-                                            </span>
-                                            <Link
-                                                href={`/${locale}/cms/course/${course.id}`}
-                                                className="text-emerald-600 hover:text-emerald-700 text-sm font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform"
-                                            >
-                                                {t('CMS.edit_outline')} <span aria-hidden="true">&rarr;</span>
-                                            </Link>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center text-center py-20 bg-white border border-slate-200 rounded-xl shadow-sm">
@@ -374,7 +396,7 @@ export default function CMSDashboard() {
                                         type="text"
                                         placeholder="Thumbnail URL (Optional)"
                                         value={courseFormData.thumbnail || ""}
-                                        onChange={(e) => setCourseFormData({...courseFormData, thumbnail: e.target.value})}
+                                        onChange={(e) => setCourseFormData({ ...courseFormData, thumbnail: e.target.value })}
                                         className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                     />
                                     <button
@@ -487,7 +509,7 @@ export default function CMSDashboard() {
                                         type="text"
                                         placeholder="Thumbnail URL (Optional)"
                                         value={courseFormData.thumbnail || ""}
-                                        onChange={(e) => setCourseFormData({...courseFormData, thumbnail: e.target.value})}
+                                        onChange={(e) => setCourseFormData({ ...courseFormData, thumbnail: e.target.value })}
                                         className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                     />
                                     <button
@@ -507,7 +529,8 @@ export default function CMSDashboard() {
                                     <button type="button" onClick={() => setCourseFormData({ ...courseFormData, thumbnail: '' })} className="text-xs text-rose-500 mt-2 hover:underline">{t('Modal.remove_image')}</button>
                                 )}
                             </div>
-                            {showDeleteConfirm && (
+                            {/* Superuser/staff only delete controls */}
+                            {userRole !== 'lecturer' && showDeleteConfirm && (
                                 <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg mt-4 mb-2 animate-in fade-in slide-in-from-top-2 duration-200">
                                     <h4 className="text-sm font-bold text-rose-800 mb-2">{t('Modal.confirm_delete_title')}</h4>
                                     <p className="text-xs text-rose-600 mb-3 block">{t('Modal.confirm_delete_desc')}</p>
@@ -559,13 +582,17 @@ export default function CMSDashboard() {
 
                             {!showDeleteConfirm && (
                                 <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-100">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowDeleteConfirm(true)}
-                                        className="px-4 py-2 text-sm font-medium text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors flex items-center gap-1.5"
-                                    >
-                                        <Trash2 size={14} /> {t('Modal.delete_course')}
-                                    </button>
+                                    {userRole !== 'lecturer' ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowDeleteConfirm(true)}
+                                            className="px-4 py-2 text-sm font-medium text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors flex items-center gap-1.5"
+                                        >
+                                            <Trash2 size={14} /> {t('Modal.delete_course')}
+                                        </button>
+                                    ) : (
+                                        <div></div> // Empty div to keep save buttons on the right
+                                    )}
                                     <div className="flex gap-3">
                                         <button
                                             type="button"
@@ -589,8 +616,8 @@ export default function CMSDashboard() {
             )}
 
             {showMediaSelector && (
-                <MediaLibrarySelector 
-                    onSelectOption={(url) => setCourseFormData({...courseFormData, thumbnail: url})}
+                <MediaLibrarySelector
+                    onSelectOption={(url) => setCourseFormData({ ...courseFormData, thumbnail: url })}
                     onClose={() => setShowMediaSelector(false)}
                 />
             )}
