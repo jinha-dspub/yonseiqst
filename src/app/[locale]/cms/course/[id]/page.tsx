@@ -730,6 +730,7 @@ export default function CourseOutlineEditor() {
                             >
                                 <Plus size={14} /> Section
                             </button>
+                        )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-3 outline-tree custom-scrollbar">
