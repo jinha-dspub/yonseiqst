@@ -202,7 +202,7 @@ export default function LMSDashboard() {
     return (
         <div className="min-h-screen bg-slate-50 font-sans">
             {/* Header */}
-            <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+            <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
                 <div className="flex items-center gap-2 sm:gap-3">
                     <div className="bg-blue-600 text-white p-1.5 sm:p-2 rounded-lg">
                         <GraduationCap size={20} />
@@ -411,8 +411,8 @@ function CourseCard({ course, t, locale, router, isEnrolled, onEnroll }: { cours
                         router.push(`/${locale}/lms/course/${course.id}`);
                     }}
                     className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm ${course.visibility === 'cohort'
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
-                            : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
+                        : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
                         }`}
                 >
                     {isEnrolled ? t('start_learning') : '수강 시작하기'}
