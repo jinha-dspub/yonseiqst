@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { BookOpen, Search, Filter, PlayCircle, ArrowLeft, ArrowRight, GraduationCap, Target, Bell, ClipboardList } from 'lucide-react';
+import { BookOpen, Search, Filter, PlayCircle, ArrowLeft, ArrowRight, GraduationCap, Target, Bell, ClipboardList, LogOut } from 'lucide-react';
 import { Course } from '@/lib/lms/types';
 import { getMockCourse } from '@/lib/lms/mockData';
 import { getCourses } from '@/lib/courseService';
@@ -26,23 +26,34 @@ export default function LMSDashboard() {
     const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
     const [notifications, setNotifications] = useState<any[]>([]);
 
+    const handleDirectSignOut = async () => {
+        try {
+            const supabaseClient = createClient();
+            await supabaseClient.auth.signOut();
+            sessionStorage.removeItem('currentUser');
+        } catch (e) {
+            console.error('SignOut error:', e);
+        }
+        window.location.href = '/';
+    };
+
     useEffect(() => {
         setMounted(true);
-        
+
         const initLms = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 router.push(`/${locale}`);
                 return;
             }
-            
+
             // Get user's cohort from the database
             const { data: userData } = await supabase.from("users").select("role, name, cohort, cohort_id").eq("id", user.id).maybeSingle();
             const role = userData?.role || "student";
             const cohort = userData?.cohort || "DEFAULT";
             let cohortId = userData?.cohort_id || null;
             const name = userData?.name || user.email;
-            
+
             // Auto-backfill: if cohort is set but cohort_id is missing, look up and persist
             if (cohort && cohort !== 'DEFAULT' && !cohortId) {
                 const { data: cohortRow } = await supabase.from("cohorts").select("id").eq("name", cohort).maybeSingle();
@@ -51,7 +62,7 @@ export default function LMSDashboard() {
                     await supabase.from("users").update({ cohort_id: cohortId }).eq("id", user.id);
                 }
             }
-            
+
             const profile = {
                 id: user.id,
                 name: name,
@@ -97,19 +108,19 @@ export default function LMSDashboard() {
                     if (c.visibility === 'none') return false;
 
                     if (c.publishDate) {
-                        const kstDateStr = c.publishDate.includes('+') || c.publishDate.endsWith('Z') 
-                            ? c.publishDate 
+                        const kstDateStr = c.publishDate.includes('+') || c.publishDate.endsWith('Z')
+                            ? c.publishDate
                             : (c.publishDate.includes('T') ? `${c.publishDate}:00+09:00` : `${c.publishDate}T00:00:00+09:00`);
-                        
+
                         const publishTimeMs = new Date(kstDateStr).getTime();
                         if (publishTimeMs > Date.now()) {
                             return false; // Not yet published
                         }
                     }
-                    
+
                     return true;
                 });
-                
+
                 // Further filter based on access
                 const isStaffUser = ['staff', 'admin', 'superuser'].includes(profile.role);
                 const accessible = published.filter(c => {
@@ -127,7 +138,7 @@ export default function LMSDashboard() {
                     }
                     return false;
                 });
-                
+
                 setCourses(accessible);
             }
 
@@ -218,6 +229,14 @@ export default function LMSDashboard() {
                         </button>
                     </div>
                     {userProfile && <UserProfileDropdown userProfile={userProfile} />}
+                    <button
+                        onClick={handleDirectSignOut}
+                        className="flex items-center gap-2 text-sm font-bold text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 px-4 py-2 rounded-lg transition-all"
+                        title="Sign Out"
+                    >
+                        <LogOut size={16} />
+                        <span className="hidden sm:block">Sign Out</span>
+                    </button>
                     <button
                         onClick={() => router.push(`/${locale}/dashboard`)}
                         className="flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-blue-600 transition-colors px-4 py-2 border border-slate-200 rounded-lg hover:border-blue-200 hover:bg-blue-50"
@@ -391,11 +410,10 @@ function CourseCard({ course, t, locale, router, isEnrolled, onEnroll }: { cours
                         }
                         router.push(`/${locale}/lms/course/${course.id}`);
                     }}
-                    className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm ${
-                        course.visibility === 'cohort' 
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100' 
-                        : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
-                    }`}
+                    className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm ${course.visibility === 'cohort'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
+                            : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
+                        }`}
                 >
                     {isEnrolled ? t('start_learning') : '수강 시작하기'}
                     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
