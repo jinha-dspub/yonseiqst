@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { BookOpen, Search, Filter, PlayCircle, ArrowLeft, ArrowRight, GraduationCap, Target, Bell, ClipboardList, LogOut } from 'lucide-react';
+import { BookOpen, Search, Filter, PlayCircle, ArrowLeft, ArrowRight, GraduationCap, Target, Bell, ClipboardList } from 'lucide-react';
 import { Course } from '@/lib/lms/types';
 import { getMockCourse } from '@/lib/lms/mockData';
 import { getCourses } from '@/lib/courseService';
@@ -25,17 +25,6 @@ export default function LMSDashboard() {
     const [userProfile, setUserProfile] = useState<any>(null);
     const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
     const [notifications, setNotifications] = useState<any[]>([]);
-
-    const handleDirectSignOut = async () => {
-        try {
-            const supabaseClient = createClient();
-            await supabaseClient.auth.signOut();
-            sessionStorage.removeItem('currentUser');
-        } catch (e) {
-            console.error('SignOut error:', e);
-        }
-        window.location.href = '/';
-    };
 
     useEffect(() => {
         setMounted(true);
@@ -229,14 +218,6 @@ export default function LMSDashboard() {
                         </button>
                     </div>
                     {userProfile && <UserProfileDropdown userProfile={userProfile} />}
-                    <button
-                        onClick={handleDirectSignOut}
-                        className="flex items-center gap-2 text-sm font-bold text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 px-4 py-2 rounded-lg transition-all"
-                        title="Sign Out"
-                    >
-                        <LogOut size={16} />
-                        <span className="hidden sm:block">Sign Out</span>
-                    </button>
                     <button
                         onClick={() => router.push(`/${locale}/dashboard`)}
                         className="flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-blue-600 transition-colors px-4 py-2 border border-slate-200 rounded-lg hover:border-blue-200 hover:bg-blue-50"

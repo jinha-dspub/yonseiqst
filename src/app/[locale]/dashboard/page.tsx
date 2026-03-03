@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import UserProfileDropdown from "@/components/dashboard/UserProfileDropdown";
 import { MissionNodesMock } from "@/lib/mockData";
 import { getCourses } from "@/lib/courseService";
-import { BookOpen, PlayCircle, ArrowRight, RefreshCw, LogOut } from "lucide-react";
+import { BookOpen, PlayCircle, ArrowRight, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 
@@ -19,17 +19,6 @@ export default function DashboardPage() {
     const [isStaff, setIsStaff] = useState(false);
     const [assignedCourse, setAssignedCourse] = useState<any>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
-
-    const handleDirectSignOut = async () => {
-        try {
-            const supabase2 = createClient();
-            await supabase2.auth.signOut();
-            sessionStorage.removeItem("currentUser");
-        } catch (e) {
-            console.error("SignOut error:", e);
-        }
-        window.location.href = "/";
-    };
 
     useEffect(() => {
         setMounted(true);
@@ -122,14 +111,6 @@ export default function DashboardPage() {
                         <RefreshCw size={18} />
                     </button>
                     <UserProfileDropdown userProfile={userProfile} />
-                    <button
-                        onClick={handleDirectSignOut}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 rounded-lg transition-all"
-                        title="Sign Out"
-                    >
-                        <LogOut size={16} />
-                        <span className="hidden sm:block">Sign Out</span>
-                    </button>
                 </div>
             </header>
 
