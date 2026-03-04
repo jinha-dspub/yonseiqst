@@ -74,7 +74,7 @@ export default function LMSCoursePlayer() {
                 router.push(`/${locale}`);
                 return;
             }
-            
+
             // Get user's cohort from the database
             const { data: userData } = await supabase.from("users").select("role, name, cohort, cohort_id").eq("id", user.id).maybeSingle();
             const role = userData?.role || "student";
@@ -90,7 +90,7 @@ export default function LMSCoursePlayer() {
                     await supabase.from("users").update({ cohort_id: cohortId }).eq("id", user.id);
                 }
             }
-            
+
             const profile = {
                 id: user.id,
                 name: name,
@@ -120,7 +120,7 @@ export default function LMSCoursePlayer() {
                 // Try Supabase first for the single course
                 setDataSource('loading');
                 const dbCourse = await getCourseById(courseId);
-                
+
                 if (dbCourse) {
                     setDataSource('cloud');
                     setLastSyncError(null);
@@ -135,13 +135,13 @@ export default function LMSCoursePlayer() {
                 const rawCourse = dbCourse || courses.find((c: any) => c.id === courseId);
 
                 if (rawCourse && rawCourse.status !== 'none') {
-                    
+
                     if (rawCourse.visibility === 'cohort') {
                         const isStaffUser = ['staff', 'admin', 'superuser'].includes(profile.role);
-                        
+
                         if (!isStaffUser) {
                             let hasAccess = false;
-                            
+
                             if (!rawCourse.allowedCohorts || rawCourse.allowedCohorts.length === 0) {
                                 // No cohorts assigned = available to all
                                 hasAccess = true;
@@ -152,7 +152,7 @@ export default function LMSCoursePlayer() {
                                         .from("cohort_memberships")
                                         .select("cohort_id")
                                         .eq("user_id", user.id);
-                                    
+
                                     if (myMemberships && myMemberships.length > 0) {
                                         const myCohortIds = myMemberships.map(m => m.cohort_id);
                                         hasAccess = rawCourse.allowedCohorts.some((id: string) => myCohortIds.includes(id));
@@ -164,7 +164,7 @@ export default function LMSCoursePlayer() {
                                     }
                                 }
                             }
-                            
+
                             if (!hasAccess) {
                                 router.push(`/${locale}/lms`);
                                 return;
@@ -174,12 +174,12 @@ export default function LMSCoursePlayer() {
 
                     const isScheduledInFuture = (dateStr?: string) => {
                         if (!dateStr) return false;
-                        const kstDateStr = dateStr.includes('+') || dateStr.endsWith('Z') 
-                            ? dateStr 
+                        const kstDateStr = dateStr.includes('+') || dateStr.endsWith('Z')
+                            ? dateStr
                             : (dateStr.includes('T') ? `${dateStr}:00+09:00` : `${dateStr}T00:00:00+09:00`);
                         return new Date(kstDateStr).getTime() > Date.now();
                     };
-                    
+
                     const publishedCourse: Course = {
                         ...rawCourse,
                         sections: rawCourse.sections
@@ -195,7 +195,7 @@ export default function LMSCoursePlayer() {
                                         .map((sub: any) => {
                                             const isSubScheduled = isScheduledInFuture(sub.publishDate);
                                             let effectiveSubStatus = sub.status === 'draft' ? 'draft' : (isSubScheduled ? 'scheduled' : 'published');
-                                            
+
                                             if (effectiveStatus === 'draft') effectiveSubStatus = 'draft';
                                             else if (effectiveStatus === 'scheduled' && effectiveSubStatus === 'published') effectiveSubStatus = 'scheduled';
 
@@ -205,7 +205,7 @@ export default function LMSCoursePlayer() {
                                                 units: sub.units.filter((u: any) => u.status !== 'none').map((u: any) => {
                                                     const isUnitScheduled = isScheduledInFuture(u.publishDate);
                                                     let effectiveUnitStatus = u.status === 'draft' ? 'draft' : (isUnitScheduled ? 'scheduled' : 'published');
-                                                    
+
                                                     if (effectiveSubStatus === 'draft') effectiveUnitStatus = 'draft';
                                                     else if (effectiveSubStatus === 'scheduled' && effectiveUnitStatus === 'published') effectiveUnitStatus = 'scheduled';
 
@@ -291,6 +291,27 @@ export default function LMSCoursePlayer() {
         }
     };
 
+    const handleUnenroll = async () => {
+        if (!userProfile) return;
+
+        if (!confirm('정말로 이 코스의 수강을 철회하시겠습니까? 신청 내역과 학습 진도가 모두 삭제됩니다.')) return;
+
+        const { error } = await supabase
+            .from('enrollments')
+            .delete()
+            .eq('user_id', userProfile.id)
+            .eq('course_id', courseId);
+
+        if (error) {
+            console.error('Unenrollment failed:', error);
+            alert(`수강 철회에 실패했습니다: ${error.message}`);
+            return;
+        }
+
+        alert('수강 철회가 완료되었습니다. 대시보드로 이동합니다.');
+        router.push(`/${locale}/lms`);
+    };
+
     // Auto-mark non-quiz units as completed after viewing for 2 seconds
     useEffect(() => {
         if (!currentUnitId || !course) return;
@@ -368,6 +389,12 @@ export default function LMSCoursePlayer() {
                         </div>
                     )}
                     {userProfile && <UserProfileDropdown userProfile={userProfile} />}
+                    <button
+                        onClick={handleUnenroll}
+                        className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
+                    >
+                        수강 철회
+                    </button>
                     <div className="text-xs bg-slate-800 text-emerald-400 px-3 py-1 rounded-full font-bold hidden sm:block border border-slate-700">
                         {completedUnits.size} / {allUnits.length} {t('completed')}
                     </div>
@@ -378,203 +405,202 @@ export default function LMSCoursePlayer() {
                 {/* Left Sidebar (Course Outline) - overlay on mobile */}
                 {sidebarOpen && (
                     <>
-                    {/* Mobile backdrop */}
-                    <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
-                    <aside className="fixed md:relative inset-y-14 left-0 w-[85vw] sm:w-[320px] md:w-[320px] bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-xl md:shadow-inner z-40 md:z-10 transition-all">
-                        <div className="p-6">
-                            {/* Progress Bar */}
-                            {(() => {
-                                const totalUnits = allUnits.filter(u => u.unit.status === 'published').length;
-                                const completedCount = allUnits.filter(u => u.unit.status === 'published' && completedUnits.has(u.unit.id)).length;
-                                const pct = totalUnits > 0 ? Math.round((completedCount / totalUnits) * 100) : 0;
-                                return (
-                                    <div className="mb-5">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h2 className="font-bold text-slate-800 tracking-tight text-lg">{t('course_progress')}</h2>
-                                            <span className="text-sm font-bold text-emerald-600">{pct}%</span>
-                                        </div>
-                                        <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-500"
-                                                style={{ width: `${pct}%` }}
-                                            />
-                                        </div>
-                                        <p className="text-[10px] text-slate-400 mt-1 font-bold">{completedCount} / {totalUnits} units completed</p>
-                                    </div>
-                                );
-                            })()}
-
-                            <div className="space-y-4">
-                                {course.sections.map((section, sIdx) => {
-                                    const isExpanded = expandedSections.has(section.id);
-                                    // Calculate section completion
-                                    const sectionUnits = section.subsections.flatMap(sub => sub.units.filter(u => u.status === 'published'));
-                                    const sectionCompleted = sectionUnits.filter(u => completedUnits.has(u.id)).length;
-                                    const sectionTotal = sectionUnits.length;
-                                    const sectionPct = sectionTotal > 0 ? Math.round((sectionCompleted / sectionTotal) * 100) : 0;
-                                    const isFullyComplete = sectionCompleted === sectionTotal && sectionTotal > 0;
+                        {/* Mobile backdrop */}
+                        <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
+                        <aside className="fixed md:relative inset-y-14 left-0 w-[85vw] sm:w-[320px] md:w-[320px] bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-xl md:shadow-inner z-40 md:z-10 transition-all">
+                            <div className="p-6">
+                                {/* Progress Bar */}
+                                {(() => {
+                                    const totalUnits = allUnits.filter(u => u.unit.status === 'published').length;
+                                    const completedCount = allUnits.filter(u => u.unit.status === 'published' && completedUnits.has(u.unit.id)).length;
+                                    const pct = totalUnits > 0 ? Math.round((completedCount / totalUnits) * 100) : 0;
                                     return (
-                                        <div key={section.id} className={`border rounded-xl overflow-hidden shadow-sm ${isFullyComplete ? 'border-green-300 bg-green-50/30' : 'border-slate-200 bg-white'}`}>
-                                            {/* Section Header */}
-                                            <div
-                                                className={`p-4 border-b flex items-center justify-between cursor-pointer transition-colors ${isFullyComplete ? 'bg-green-50 border-green-200 hover:bg-green-100/50' : 'bg-slate-100/50 border-slate-200 hover:bg-emerald-50/50'}`}
-                                                onClick={(e) => toggleSection(section.id, e)}
-                                            >
-                                                <div className="flex flex-col flex-1 mr-3">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('section')} {sIdx + 1}</span>
-                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isFullyComplete ? 'bg-green-200 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
-                                                            {sectionCompleted}/{sectionTotal}
-                                                        </span>
-                                                    </div>
-                                                    <span className="font-bold text-slate-800 text-sm">{section.title}</span>
-                                                    {/* Mini progress bar */}
-                                                    <div className="w-full h-1 bg-slate-200 rounded-full mt-2 overflow-hidden">
-                                                        <div
-                                                            className={`h-full rounded-full transition-all duration-500 ${isFullyComplete ? 'bg-green-500' : 'bg-emerald-400'}`}
-                                                            style={{ width: `${sectionPct}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="text-slate-400">
-                                                    {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                                                </div>
+                                        <div className="mb-5">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h2 className="font-bold text-slate-800 tracking-tight text-lg">{t('course_progress')}</h2>
+                                                <span className="text-sm font-bold text-emerald-600">{pct}%</span>
                                             </div>
-
-                                            {/* Subsections */}
-                                            {isExpanded && (
-                                                <div className="flex flex-col">
-                                                    {section.subsections.map(sub => {
-                                                        const isSubActive = currentUnitMeta?.subsectionName === sub.title;
-                                                        const subUnits = sub.units.filter(u => u.status === 'published');
-                                                        const subCompleted = subUnits.filter(u => completedUnits.has(u.id)).length;
-                                                        const subTotal = subUnits.length;
-                                                        const subAllDone = subCompleted === subTotal && subTotal > 0;
-                                                        return (
-                                                            <div key={sub.id} className="border-b border-slate-100 last:border-0">
-                                                                <div className={`px-4 py-2 text-xs font-bold uppercase tracking-wider ${isSubActive ? 'text-emerald-600 bg-emerald-50/30' : subAllDone ? 'text-green-600 bg-green-50/30' : (sub.status === 'draft' || sub.status === 'scheduled') ? 'text-slate-400 bg-slate-50 opacity-70' : 'text-slate-500 bg-slate-50/50'}`}>
-                                                                    <div className="flex items-center justify-between">
-                                                                        <span>{sub.title}</span>
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            {sub.status === 'draft' && <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">DRAFT</span>}
-                                                                            {sub.status === 'scheduled' && sub.publishDate && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded flex items-center gap-1"><Clock size={10}/>{new Date(sub.publishDate).toLocaleDateString()}</span>}
-                                                                            {subTotal > 0 && (
-                                                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${subAllDone ? 'bg-green-200 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
-                                                                                    {subCompleted}/{subTotal}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                    {subTotal > 0 && (
-                                                                        <div className="w-full h-0.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
-                                                                            <div className={`h-full rounded-full transition-all duration-500 ${subAllDone ? 'bg-green-500' : 'bg-emerald-400'}`} style={{ width: `${subTotal > 0 ? (subCompleted / subTotal) * 100 : 0}%` }} />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex flex-col py-1">
-                                                                    {sub.units.map((unit, uIdx) => {
-                                                                        const isCurrent = currentUnitId === unit.id;
-                                                                        const isCompleted = completedUnits.has(unit.id);
-                                                                        const isUnavailable = unit.status === 'draft' || unit.status === 'scheduled';
-                                                                        const isUnitExpanded = expandedUnitComponents.has(unit.id);
-                                                                        const hasComponents = unit.components && unit.components.length > 0;
-                                                                        return (
-                                                                            <div key={unit.id}>
-                                                                                <div
-                                                                                    onClick={() => {
-                                                                                        if (!isUnavailable) {
-                                                                                            setCurrentUnitId(unit.id);
-                                                                                            if (window.innerWidth < 768) setSidebarOpen(false);
-                                                                                        }
-                                                                                    }}
-                                                                                    className={`flex items-start gap-3 px-4 py-2.5 text-sm transition-colors border-l-4
-                                                                                        ${isUnavailable ? 'cursor-not-allowed opacity-50 grayscale' : 'cursor-pointer'}
-                                                                                        ${isCurrent
-                                                                                            ? 'bg-emerald-50 border-emerald-500 text-emerald-800'
-                                                                                            : isCompleted 
-                                                                                                ? 'bg-green-50/60 border-green-400 text-green-700 hover:bg-green-50'
-                                                                                                : isUnavailable ? 'border-transparent text-slate-500' : 'border-transparent hover:bg-slate-50 text-slate-600'
-                                                                                        }
-                                                                                    `}
-                                                                                >
-                                                                                    <div className="mt-0.5 w-4 h-4 flex-shrink-0">
-                                                                                        {isCompleted ? (
-                                                                                            <CheckCircle2 size={16} className="text-emerald-500" />
-                                                                                        ) : isCurrent ? (
-                                                                                            <PlayCircle size={16} className="text-emerald-600" />
-                                                                                        ) : (
-                                                                                            <Circle size={16} className="text-slate-300" />
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div className="flex items-center gap-2 flex-1 mt-0.5 pr-2">
-                                                                                        <span className={`leading-snug flex-1 ${isCurrent ? 'font-bold' : 'font-medium'}`}>{unit.title}</span>
-                                                                                        {hasComponents && (
-                                                                                            <button
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setExpandedUnitComponents(prev => {
-                                                                                                        const next = new Set(prev);
-                                                                                                        if (next.has(unit.id)) next.delete(unit.id);
-                                                                                                        else next.add(unit.id);
-                                                                                                        return next;
-                                                                                                    });
-                                                                                                }}
-                                                                                                className="text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-100 transition-colors flex-shrink-0"
-                                                                                                title={`${unit.components.length} components`}
-                                                                                            >
-                                                                                                {isUnitExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                                                                            </button>
-                                                                                        )}
-                                                                                        {unit.status === 'draft' && <span className="text-[9px] bg-slate-200 text-slate-500 px-1 py-0.5 rounded font-bold">DRAFT</span>}
-                                                                                        {unit.status === 'scheduled' && unit.publishDate && <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-bold">{new Date(unit.publishDate).toLocaleDateString()}</span>}
-                                                                                    </div>
-                                                                                </div>
-                                                                                {/* Component preview */}
-                                                                                {isUnitExpanded && hasComponents && (
-                                                                                    <div className="ml-11 mr-4 mb-2 mt-0.5 space-y-0.5 border-l border-dashed border-slate-200 pl-2">
-                                                                                        {unit.components.map((comp, cIdx) => (
-                                                                                            <div
-                                                                                                key={comp.id}
-                                                                                                className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-slate-500 hover:bg-slate-50 rounded cursor-pointer transition-colors"
-                                                                                                onClick={() => !isUnavailable && setCurrentUnitId(unit.id)}
-                                                                                                title={comp.title || comp.content}
-                                                                                            >
-                                                                                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                                                                                    comp.type === 'html' ? 'bg-blue-400' :
-                                                                                                    comp.type === 'video' ? 'bg-red-400' :
-                                                                                                    comp.type === 'embed' ? 'bg-purple-400' :
-                                                                                                    comp.type === 'quiz' ? 'bg-amber-400' : 'bg-slate-400'
-                                                                                                }`}></span>
-                                                                                                <span className="font-bold uppercase tracking-wider text-[9px] w-8 flex-shrink-0 text-slate-400">
-                                                                                                    {comp.type === 'html' ? 'TXT' :
-                                                                                                     comp.type === 'video' ? 'VID' :
-                                                                                                     comp.type === 'embed' ? 'EMB' :
-                                                                                                     comp.type === 'quiz' ? 'QIZ' : comp.type.slice(0,3).toUpperCase()}
-                                                                                                </span>
-                                                                                                <span className="truncate flex-1 font-medium text-slate-600">
-                                                                                                    {comp.title || (comp.type === 'html'
-                                                                                                        ? (comp.content || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').slice(0, 30) || 'Untitled'
-                                                                                                        : 'Untitled')}
-                                                                                                </span>
-                                                                                            </div>
-                                                                                        ))}
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
+                                            <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-500"
+                                                    style={{ width: `${pct}%` }}
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 mt-1 font-bold">{completedCount} / {totalUnits} units completed</p>
                                         </div>
                                     );
-                                })}
+                                })()}
+
+                                <div className="space-y-4">
+                                    {course.sections.map((section, sIdx) => {
+                                        const isExpanded = expandedSections.has(section.id);
+                                        // Calculate section completion
+                                        const sectionUnits = section.subsections.flatMap(sub => sub.units.filter(u => u.status === 'published'));
+                                        const sectionCompleted = sectionUnits.filter(u => completedUnits.has(u.id)).length;
+                                        const sectionTotal = sectionUnits.length;
+                                        const sectionPct = sectionTotal > 0 ? Math.round((sectionCompleted / sectionTotal) * 100) : 0;
+                                        const isFullyComplete = sectionCompleted === sectionTotal && sectionTotal > 0;
+                                        return (
+                                            <div key={section.id} className={`border rounded-xl overflow-hidden shadow-sm ${isFullyComplete ? 'border-green-300 bg-green-50/30' : 'border-slate-200 bg-white'}`}>
+                                                {/* Section Header */}
+                                                <div
+                                                    className={`p-4 border-b flex items-center justify-between cursor-pointer transition-colors ${isFullyComplete ? 'bg-green-50 border-green-200 hover:bg-green-100/50' : 'bg-slate-100/50 border-slate-200 hover:bg-emerald-50/50'}`}
+                                                    onClick={(e) => toggleSection(section.id, e)}
+                                                >
+                                                    <div className="flex flex-col flex-1 mr-3">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('section')} {sIdx + 1}</span>
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isFullyComplete ? 'bg-green-200 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
+                                                                {sectionCompleted}/{sectionTotal}
+                                                            </span>
+                                                        </div>
+                                                        <span className="font-bold text-slate-800 text-sm">{section.title}</span>
+                                                        {/* Mini progress bar */}
+                                                        <div className="w-full h-1 bg-slate-200 rounded-full mt-2 overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full transition-all duration-500 ${isFullyComplete ? 'bg-green-500' : 'bg-emerald-400'}`}
+                                                                style={{ width: `${sectionPct}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-slate-400">
+                                                        {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                                    </div>
+                                                </div>
+
+                                                {/* Subsections */}
+                                                {isExpanded && (
+                                                    <div className="flex flex-col">
+                                                        {section.subsections.map(sub => {
+                                                            const isSubActive = currentUnitMeta?.subsectionName === sub.title;
+                                                            const subUnits = sub.units.filter(u => u.status === 'published');
+                                                            const subCompleted = subUnits.filter(u => completedUnits.has(u.id)).length;
+                                                            const subTotal = subUnits.length;
+                                                            const subAllDone = subCompleted === subTotal && subTotal > 0;
+                                                            return (
+                                                                <div key={sub.id} className="border-b border-slate-100 last:border-0">
+                                                                    <div className={`px-4 py-2 text-xs font-bold uppercase tracking-wider ${isSubActive ? 'text-emerald-600 bg-emerald-50/30' : subAllDone ? 'text-green-600 bg-green-50/30' : (sub.status === 'draft' || sub.status === 'scheduled') ? 'text-slate-400 bg-slate-50 opacity-70' : 'text-slate-500 bg-slate-50/50'}`}>
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span>{sub.title}</span>
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                {sub.status === 'draft' && <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">DRAFT</span>}
+                                                                                {sub.status === 'scheduled' && sub.publishDate && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded flex items-center gap-1"><Clock size={10} />{new Date(sub.publishDate).toLocaleDateString()}</span>}
+                                                                                {subTotal > 0 && (
+                                                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${subAllDone ? 'bg-green-200 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
+                                                                                        {subCompleted}/{subTotal}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        {subTotal > 0 && (
+                                                                            <div className="w-full h-0.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
+                                                                                <div className={`h-full rounded-full transition-all duration-500 ${subAllDone ? 'bg-green-500' : 'bg-emerald-400'}`} style={{ width: `${subTotal > 0 ? (subCompleted / subTotal) * 100 : 0}%` }} />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex flex-col py-1">
+                                                                        {sub.units.map((unit, uIdx) => {
+                                                                            const isCurrent = currentUnitId === unit.id;
+                                                                            const isCompleted = completedUnits.has(unit.id);
+                                                                            const isUnavailable = unit.status === 'draft' || unit.status === 'scheduled';
+                                                                            const isUnitExpanded = expandedUnitComponents.has(unit.id);
+                                                                            const hasComponents = unit.components && unit.components.length > 0;
+                                                                            return (
+                                                                                <div key={unit.id}>
+                                                                                    <div
+                                                                                        onClick={() => {
+                                                                                            if (!isUnavailable) {
+                                                                                                setCurrentUnitId(unit.id);
+                                                                                                if (window.innerWidth < 768) setSidebarOpen(false);
+                                                                                            }
+                                                                                        }}
+                                                                                        className={`flex items-start gap-3 px-4 py-2.5 text-sm transition-colors border-l-4
+                                                                                        ${isUnavailable ? 'cursor-not-allowed opacity-50 grayscale' : 'cursor-pointer'}
+                                                                                        ${isCurrent
+                                                                                                ? 'bg-emerald-50 border-emerald-500 text-emerald-800'
+                                                                                                : isCompleted
+                                                                                                    ? 'bg-green-50/60 border-green-400 text-green-700 hover:bg-green-50'
+                                                                                                    : isUnavailable ? 'border-transparent text-slate-500' : 'border-transparent hover:bg-slate-50 text-slate-600'
+                                                                                            }
+                                                                                    `}
+                                                                                    >
+                                                                                        <div className="mt-0.5 w-4 h-4 flex-shrink-0">
+                                                                                            {isCompleted ? (
+                                                                                                <CheckCircle2 size={16} className="text-emerald-500" />
+                                                                                            ) : isCurrent ? (
+                                                                                                <PlayCircle size={16} className="text-emerald-600" />
+                                                                                            ) : (
+                                                                                                <Circle size={16} className="text-slate-300" />
+                                                                                            )}
+                                                                                        </div>
+                                                                                        <div className="flex items-center gap-2 flex-1 mt-0.5 pr-2">
+                                                                                            <span className={`leading-snug flex-1 ${isCurrent ? 'font-bold' : 'font-medium'}`}>{unit.title}</span>
+                                                                                            {hasComponents && (
+                                                                                                <button
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        setExpandedUnitComponents(prev => {
+                                                                                                            const next = new Set(prev);
+                                                                                                            if (next.has(unit.id)) next.delete(unit.id);
+                                                                                                            else next.add(unit.id);
+                                                                                                            return next;
+                                                                                                        });
+                                                                                                    }}
+                                                                                                    className="text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-100 transition-colors flex-shrink-0"
+                                                                                                    title={`${unit.components.length} components`}
+                                                                                                >
+                                                                                                    {isUnitExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                                                </button>
+                                                                                            )}
+                                                                                            {unit.status === 'draft' && <span className="text-[9px] bg-slate-200 text-slate-500 px-1 py-0.5 rounded font-bold">DRAFT</span>}
+                                                                                            {unit.status === 'scheduled' && unit.publishDate && <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-bold">{new Date(unit.publishDate).toLocaleDateString()}</span>}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    {/* Component preview */}
+                                                                                    {isUnitExpanded && hasComponents && (
+                                                                                        <div className="ml-11 mr-4 mb-2 mt-0.5 space-y-0.5 border-l border-dashed border-slate-200 pl-2">
+                                                                                            {unit.components.map((comp, cIdx) => (
+                                                                                                <div
+                                                                                                    key={comp.id}
+                                                                                                    className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-slate-500 hover:bg-slate-50 rounded cursor-pointer transition-colors"
+                                                                                                    onClick={() => !isUnavailable && setCurrentUnitId(unit.id)}
+                                                                                                    title={comp.title || comp.content}
+                                                                                                >
+                                                                                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${comp.type === 'html' ? 'bg-blue-400' :
+                                                                                                            comp.type === 'video' ? 'bg-red-400' :
+                                                                                                                comp.type === 'embed' ? 'bg-purple-400' :
+                                                                                                                    comp.type === 'quiz' ? 'bg-amber-400' : 'bg-slate-400'
+                                                                                                        }`}></span>
+                                                                                                    <span className="font-bold uppercase tracking-wider text-[9px] w-8 flex-shrink-0 text-slate-400">
+                                                                                                        {comp.type === 'html' ? 'TXT' :
+                                                                                                            comp.type === 'video' ? 'VID' :
+                                                                                                                comp.type === 'embed' ? 'EMB' :
+                                                                                                                    comp.type === 'quiz' ? 'QIZ' : comp.type.slice(0, 3).toUpperCase()}
+                                                                                                    </span>
+                                                                                                    <span className="truncate flex-1 font-medium text-slate-600">
+                                                                                                        {comp.title || (comp.type === 'html'
+                                                                                                            ? (comp.content || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').slice(0, 30) || 'Untitled'
+                                                                                                            : 'Untitled')}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    </aside>
+                        </aside>
                     </>
                 )}
 
@@ -685,8 +711,8 @@ export default function LMSCoursePlayer() {
                                                             </ReactMarkdown>
                                                         </div>
                                                     ) : (
-                                                        <div 
-                                                            className="prose prose-slate prose-lg max-w-none prose-emerald ck-content" 
+                                                        <div
+                                                            className="prose prose-slate prose-lg max-w-none prose-emerald ck-content"
                                                             dangerouslySetInnerHTML={{ __html: comp.content }}
                                                         />
                                                     );
@@ -697,7 +723,7 @@ export default function LMSCoursePlayer() {
                                                     const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
                                                     const isDirect = /\.(mp4|webm|ogg)(\?|$)/i.test(url);
                                                     const isGDrive = url.includes('drive.google.com');
-                                                    
+
                                                     // Convert Google Drive share link to embed
                                                     const getGDriveEmbedUrl = (u: string) => {
                                                         const match = u.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -732,7 +758,7 @@ export default function LMSCoursePlayer() {
                                                                             }
                                                                         }
                                                                     }
-                                                                } catch {}
+                                                                } catch { }
                                                             };
 
                                                             window.addEventListener('message', handleMessage);
@@ -785,7 +811,7 @@ export default function LMSCoursePlayer() {
                                                         const videoRef = React.useRef<HTMLVideoElement>(null);
                                                         const [watchPct, setWatchPct] = React.useState(0);
                                                         const [done80, setDone80] = React.useState(false);
-                                                        
+
                                                         const handleTimeUpdate = () => {
                                                             if (videoRef.current) {
                                                                 const pct = Math.round((videoRef.current.currentTime / videoRef.current.duration) * 100);
@@ -896,7 +922,7 @@ export default function LMSCoursePlayer() {
                                                                     rel="noopener noreferrer"
                                                                     className="inline-flex items-center gap-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-700 font-bold text-xs px-4 py-2 rounded-lg transition-all shadow-sm hover:shadow"
                                                                 >
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
                                                                     Open in New Window
                                                                 </a>
                                                             </div>
@@ -936,7 +962,7 @@ export default function LMSCoursePlayer() {
                                                         </div>
 
                                                         {/* Advanced Quiz Rendering Engine */}
-                                                        <QuizRenderer 
+                                                        <QuizRenderer
                                                             content={comp.content}
                                                             componentId={comp.id}
                                                             courseId={courseId}
@@ -971,7 +997,7 @@ export default function LMSCoursePlayer() {
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        
+
                                                         {comp.displayMode === 'iframe' ? (
                                                             <div className="w-full h-[600px] border border-slate-200 rounded-xl overflow-hidden mt-6 bg-slate-100 relative">
                                                                 {/* Fallback link above the iframe just in case it's blocked */}
@@ -982,9 +1008,9 @@ export default function LMSCoursePlayer() {
                                                             </div>
                                                         ) : (
                                                             <div className="mt-6 flex">
-                                                                <a 
-                                                                    href={comp.content} 
-                                                                    target="_blank" 
+                                                                <a
+                                                                    href={comp.content}
+                                                                    target="_blank"
                                                                     rel="noopener noreferrer"
                                                                     className="inline-flex items-center gap-2 bg-slate-800 hover:bg-black text-white font-bold py-3 px-6 rounded-xl transition-all shadow hover:shadow-lg"
                                                                 >
@@ -994,7 +1020,7 @@ export default function LMSCoursePlayer() {
                                                         )}
                                                     </div>
                                                 )}
-                                                
+
                                                 <div className="my-10 border-b border-slate-100 w-full" />
                                             </div>
                                         ))}

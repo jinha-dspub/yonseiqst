@@ -199,259 +199,225 @@ export default function LMSDashboard() {
         }
     };
 
-    const handleUnenroll = async (courseId: string) => {
-        if (!userProfile) return;
+};
 
-        if (!confirm('정말로 이 수강 신청을 철회하시겠습니까? 관련 데이터가 삭제될 수 있습니다.')) return;
+// "My Courses" = cohort-restricted courses where the student's cohort IS assigned
+// "Available Courses" = public courses + cohort courses with no cohorts assigned
+const isStaffRole = userProfile && ['staff', 'admin', 'superuser'].includes(userProfile.role);
+const myCourses = filteredCourses.filter(c => {
+    // "My Courses" strictly means I have enrolled (active or pending)
+    return enrolledCourseIds.has(c.id) || pendingCourseIds.has(c.id);
+});
 
-        const { error } = await supabase
-            .from('enrollments')
-            .delete()
-            .eq('user_id', userProfile.id)
-            .eq('course_id', courseId);
+const availableCourses = filteredCourses.filter(c => {
+    // If I already enrolled, it moves to My Courses
+    if (enrolledCourseIds.has(c.id) || pendingCourseIds.has(c.id)) return false;
 
-        if (error) {
-            console.error('Unenrollment failed:', error);
-            alert(`수강 철회에 실패했습니다: ${error.message}`);
-            return;
-        }
+    // Public courses are always available
+    if (c.visibility === 'public') return true;
 
-        setEnrolledCourseIds(prev => {
-            const next = new Set(prev);
-            next.delete(courseId);
-            return next;
-        });
-        setPendingCourseIds(prev => {
-            const next = new Set(prev);
-            next.delete(courseId);
-            return next;
-        });
+    // Cohort-restricted courses
+    if (c.visibility === 'cohort') {
+        // Staff/Superusers see everything
+        if (isStaffRole) return true;
 
-        alert('수강 철회가 완료되었습니다.');
-    };
+        // If no cohorts specified, it's open (fallback)
+        if (!c.allowedCohorts || c.allowedCohorts.length === 0) return true;
 
-    // "My Courses" = cohort-restricted courses where the student's cohort IS assigned
-    // "Available Courses" = public courses + cohort courses with no cohorts assigned
-    const isStaffRole = userProfile && ['staff', 'admin', 'superuser'].includes(userProfile.role);
-    const myCourses = filteredCourses.filter(c => {
-        // "My Courses" strictly means I have enrolled (active or pending)
-        return enrolledCourseIds.has(c.id) || pendingCourseIds.has(c.id);
-    });
+        // Otherwise, only show if student's cohort matches
+        if (userProfile && (
+            (userProfile.cohort_id && c.allowedCohorts.includes(userProfile.cohort_id)) ||
+            c.allowedCohorts.includes(userProfile.cohort)
+        )) return true;
+    }
 
-    const availableCourses = filteredCourses.filter(c => {
-        // If I already enrolled, it moves to My Courses
-        if (enrolledCourseIds.has(c.id) || pendingCourseIds.has(c.id)) return false;
+    return false;
+});
 
-        // Public courses are always available
-        if (c.visibility === 'public') return true;
+const filteredMissions = missions.filter(m =>
+    m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    m.era?.toLowerCase().includes(searchQuery.toLowerCase())
+);
 
-        // Cohort-restricted courses
-        if (c.visibility === 'cohort') {
-            // Staff/Superusers see everything
-            if (isStaffRole) return true;
-
-            // If no cohorts specified, it's open (fallback)
-            if (!c.allowedCohorts || c.allowedCohorts.length === 0) return true;
-
-            // Otherwise, only show if student's cohort matches
-            if (userProfile && (
-                (userProfile.cohort_id && c.allowedCohorts.includes(userProfile.cohort_id)) ||
-                c.allowedCohorts.includes(userProfile.cohort)
-            )) return true;
-        }
-
-        return false;
-    });
-
-    const filteredMissions = missions.filter(m =>
-        m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.era?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    return (
-        <div className="min-h-screen bg-slate-50 font-sans">
-            {/* Header */}
-            <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-                <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="bg-blue-600 text-white p-1.5 sm:p-2 rounded-lg">
-                        <GraduationCap size={20} />
-                    </div>
-                    <div>
-                        <h1 className="text-base sm:text-xl font-black text-slate-800 tracking-tight">{t('dashboard_title')}</h1>
-                        <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:block">{t('course_catalog')}</p>
-                    </div>
+return (
+    <div className="min-h-screen bg-slate-50 font-sans">
+        {/* Header */}
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+            <div className="flex items-center gap-2 sm:gap-3">
+                <div className="bg-blue-600 text-white p-1.5 sm:p-2 rounded-lg">
+                    <GraduationCap size={20} />
                 </div>
+                <div>
+                    <h1 className="text-base sm:text-xl font-black text-slate-800 tracking-tight">{t('dashboard_title')}</h1>
+                    <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:block">{t('course_catalog')}</p>
+                </div>
+            </div>
 
-                <div className="flex items-center gap-3">
-                    <Link
-                        href={`/${locale}/lms/grades`}
-                        className="flex items-center gap-1.5 text-sm font-bold text-slate-600 hover:text-purple-600 transition-colors px-3 py-2 border border-slate-200 rounded-lg hover:border-purple-200 hover:bg-purple-50"
-                    >
-                        <ClipboardList size={16} /> 성적표
-                    </Link>
-                    <div className="relative">
-                        <button className="relative p-2 text-slate-500 hover:text-blue-600 transition-colors">
-                            <Bell size={20} />
-                            {notifications.length > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{notifications.length}</span>
-                            )}
-                        </button>
-                    </div>
-                    {userProfile && <UserProfileDropdown userProfile={userProfile} />}
-                    <button
-                        onClick={() => router.push(`/${locale}/dashboard`)}
-                        className="flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-blue-600 transition-colors px-4 py-2 border border-slate-200 rounded-lg hover:border-blue-200 hover:bg-blue-50"
-                    >
-                        <ArrowLeft size={16} />
-                        {t('back_to_hub')}
+            <div className="flex items-center gap-3">
+                <Link
+                    href={`/${locale}/lms/grades`}
+                    className="flex items-center gap-1.5 text-sm font-bold text-slate-600 hover:text-purple-600 transition-colors px-3 py-2 border border-slate-200 rounded-lg hover:border-purple-200 hover:bg-purple-50"
+                >
+                    <ClipboardList size={16} /> 성적표
+                </Link>
+                <div className="relative">
+                    <button className="relative p-2 text-slate-500 hover:text-blue-600 transition-colors">
+                        <Bell size={20} />
+                        {notifications.length > 0 && (
+                            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{notifications.length}</span>
+                        )}
                     </button>
                 </div>
-            </header>
+                {userProfile && <UserProfileDropdown userProfile={userProfile} />}
+                <button
+                    onClick={() => router.push(`/${locale}/dashboard`)}
+                    className="flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-blue-600 transition-colors px-4 py-2 border border-slate-200 rounded-lg hover:border-blue-200 hover:bg-blue-50"
+                >
+                    <ArrowLeft size={16} />
+                    {t('back_to_hub')}
+                </button>
+            </div>
+        </header>
 
-            {/* Main Content */}
-            <main className="max-w-6xl mx-auto p-4 sm:p-8">
+        {/* Main Content */}
+        <main className="max-w-6xl mx-auto p-4 sm:p-8">
 
-                {/* Hero Section */}
-                <div className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl sm:rounded-3xl p-6 sm:p-10 text-white mb-6 sm:mb-10 shadow-xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
-                    <div className="relative z-10">
-                        <h2 className="text-xl sm:text-3xl font-extrabold tracking-tight mb-2 sm:mb-4">{t('welcome')}</h2>
-                        <p className="text-blue-100 text-sm sm:text-lg max-w-2xl mb-4 sm:mb-8 leading-relaxed">
-                            {t('welcome_desc')}
-                        </p>
+            {/* Hero Section */}
+            <div className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl sm:rounded-3xl p-6 sm:p-10 text-white mb-6 sm:mb-10 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
+                <div className="relative z-10">
+                    <h2 className="text-xl sm:text-3xl font-extrabold tracking-tight mb-2 sm:mb-4">{t('welcome')}</h2>
+                    <p className="text-blue-100 text-sm sm:text-lg max-w-2xl mb-4 sm:mb-8 leading-relaxed">
+                        {t('welcome_desc')}
+                    </p>
 
-                        {/* Search Bar */}
-                        <div className="relative max-w-xl">
-                            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder={t('search_placeholder')}
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-4 rounded-xl text-slate-900 bg-white border-0 shadow-lg focus:ring-4 focus:ring-blue-500/30 transition-shadow text-base sm:text-lg outline-none"
-                            />
-                        </div>
+                    {/* Search Bar */}
+                    <div className="relative max-w-xl">
+                        <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder={t('search_placeholder')}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-4 rounded-xl text-slate-900 bg-white border-0 shadow-lg focus:ring-4 focus:ring-blue-500/30 transition-shadow text-base sm:text-lg outline-none"
+                        />
                     </div>
                 </div>
+            </div>
 
-                {/* Missions (Atoms) Grid */}
-                <div className="mb-12">
-                    <div className="mb-6 flex items-center justify-between">
-                        <h3 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                            <Target className="text-rose-500" />
-                            Learning Missions
-                        </h3>
+            {/* Missions (Atoms) Grid */}
+            <div className="mb-12">
+                <div className="mb-6 flex items-center justify-between">
+                    <h3 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                        <Target className="text-rose-500" />
+                        Learning Missions
+                    </h3>
+                </div>
+
+                {filteredMissions.length === 0 ? (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center shadow-sm">
+                        <Target size={40} className="mx-auto text-slate-300 mb-4" />
+                        <p className="text-slate-500">No missions found.</p>
                     </div>
-
-                    {filteredMissions.length === 0 ? (
-                        <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center shadow-sm">
-                            <Target size={40} className="mx-auto text-slate-300 mb-4" />
-                            <p className="text-slate-500">No missions found.</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {filteredMissions.map(node => (
-                                <div key={node.id} className="relative overflow-hidden bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-xl hover:border-rose-300 transition-all flex flex-col">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <span className="text-xs font-mono px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-100 uppercase">{node.era || 'General'}</span>
-                                        <span className="text-[10px] font-black uppercase text-slate-400 border border-slate-200 px-2 py-1 rounded-full">
-                                            {node.type}
-                                        </span>
-                                    </div>
-                                    <h4 className="text-xl font-bold text-slate-800 mb-2 leading-tight">
-                                        {node.title}
-                                    </h4>
-                                    <div className="pt-4 border-t border-slate-100 mt-4 mb-6 flex-1">
-                                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Reward</p>
-                                        <p className="text-sm text-slate-600">{node.reward || 'No Reward'}</p>
-                                    </div>
-                                    <button
-                                        onClick={() => router.push(`/${locale}/lms/mission/${node.id}`)}
-                                        className="w-full bg-slate-100 hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        View Mission
-                                        <ArrowRight size={16} />
-                                    </button>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredMissions.map(node => (
+                            <div key={node.id} className="relative overflow-hidden bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-xl hover:border-rose-300 transition-all flex flex-col">
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className="text-xs font-mono px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-100 uppercase">{node.era || 'General'}</span>
+                                    <span className="text-[10px] font-black uppercase text-slate-400 border border-slate-200 px-2 py-1 rounded-full">
+                                        {node.type}
+                                    </span>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* My Courses Section */}
-                <div className="mb-12">
-                    <div className="mb-6 flex items-center justify-between">
-                        <h3 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                            <div className="bg-emerald-100 text-emerald-600 p-1.5 rounded-lg">
-                                <GraduationCap size={20} />
+                                <h4 className="text-xl font-bold text-slate-800 mb-2 leading-tight">
+                                    {node.title}
+                                </h4>
+                                <div className="pt-4 border-t border-slate-100 mt-4 mb-6 flex-1">
+                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Reward</p>
+                                    <p className="text-sm text-slate-600">{node.reward || 'No Reward'}</p>
+                                </div>
+                                <button
+                                    onClick={() => router.push(`/${locale}/lms/mission/${node.id}`)}
+                                    className="w-full bg-slate-100 hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                                >
+                                    View Mission
+                                    <ArrowRight size={16} />
+                                </button>
                             </div>
-                            {t('my_courses')}
-                        </h3>
+                        ))}
                     </div>
+                )}
+            </div>
 
-                    {myCourses.length === 0 ? (
-                        <div className="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-8 text-center">
-                            <p className="text-slate-400 text-sm font-medium italic">No enrolled courses yet.</p>
+            {/* My Courses Section */}
+            <div className="mb-12">
+                <div className="mb-6 flex items-center justify-between">
+                    <h3 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                        <div className="bg-emerald-100 text-emerald-600 p-1.5 rounded-lg">
+                            <GraduationCap size={20} />
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {myCourses.map(course => {
-                                const isEnrolled = enrolledCourseIds.has(course.id);
-                                const isPending = pendingCourseIds.has(course.id);
-                                return (
-                                    <CourseCard
-                                        key={course.id}
-                                        course={course}
-                                        t={t}
-                                        locale={locale}
-                                        router={router}
-                                        isEnrolled={isEnrolled}
-                                        isPending={isPending}
-                                        onEnroll={handleEnroll}
-                                        onUnenroll={handleUnenroll}
-                                    />
-                                );
-                            })}
-                        </div>
-                    )}
+                        {t('my_courses')}
+                    </h3>
                 </div>
 
-                {/* Available Courses Section */}
-                <div>
-                    <div className="mb-6 flex items-center justify-between">
-                        <h3 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                            <div className="bg-blue-100 text-blue-600 p-1.5 rounded-lg">
-                                <BookOpen size={20} />
-                            </div>
-                            {t('available_courses')}
-                        </h3>
+                {myCourses.length === 0 ? (
+                    <div className="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-8 text-center">
+                        <p className="text-slate-400 text-sm font-medium italic">No enrolled courses yet.</p>
                     </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {myCourses.map(course => {
+                            const isEnrolled = enrolledCourseIds.has(course.id);
+                            const isPending = pendingCourseIds.has(course.id);
+                            return (
+                                <CourseCard
+                                    key={course.id}
+                                    course={course}
+                                    t={t}
+                                    locale={locale}
+                                    router={router}
+                                    isEnrolled={isEnrolled}
+                                    isPending={isPending}
+                                    onEnroll={handleEnroll}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
 
-                    {availableCourses.length === 0 ? (
-                        <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center shadow-sm col-span-full">
-                            <BookOpen size={48} className="mx-auto text-slate-300 mb-4" />
-                            <h3 className="text-xl font-bold text-slate-700 mb-2">{t('no_courses_title')}</h3>
-                            <p className="text-slate-500">{t('no_courses_desc')}</p>
+            {/* Available Courses Section */}
+            <div>
+                <div className="mb-6 flex items-center justify-between">
+                    <h3 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                        <div className="bg-blue-100 text-blue-600 p-1.5 rounded-lg">
+                            <BookOpen size={20} />
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {availableCourses.map(course => (
-                                <CourseCard key={course.id} course={course} t={t} locale={locale} router={router} onEnroll={handleEnroll} />
-                            ))}
-                        </div>
-                    )}
+                        {t('available_courses')}
+                    </h3>
                 </div>
-            </main>
-        </div>
-    );
+
+                {availableCourses.length === 0 ? (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center shadow-sm col-span-full">
+                        <BookOpen size={48} className="mx-auto text-slate-300 mb-4" />
+                        <h3 className="text-xl font-bold text-slate-700 mb-2">{t('no_courses_title')}</h3>
+                        <p className="text-slate-500">{t('no_courses_desc')}</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {availableCourses.map(course => (
+                            <CourseCard key={course.id} course={course} t={t} locale={locale} router={router} onEnroll={handleEnroll} />
+                        ))}
+                    </div>
+                )}
+            </div>
+        </main>
+    </div>
+);
 }
 
 // Sub-component for course card
-function CourseCard({
-    course, t, locale, router, isEnrolled, isPending, onEnroll, onUnenroll
-}: {
-    course: Course, t: any, locale: string, router: any, isEnrolled?: boolean, isPending?: boolean, onEnroll?: (courseId: string) => void, onUnenroll?: (courseId: string) => void
-}) {
+function CourseCard({ course, t, locale, router, isEnrolled, isPending, onEnroll }: { course: Course, t: any, locale: string, router: any, isEnrolled?: boolean, isPending?: boolean, onEnroll?: (courseId: string) => void }) {
     return (
         <div key={course.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-xl hover:border-blue-300 transition-all group flex flex-col h-full shadow-sm">
             <div
@@ -487,37 +453,26 @@ function CourseCard({
                     {course.description || t('no_desc')}
                 </p>
 
-                <div className="flex gap-2">
-                    <button
-                        disabled={isPending}
-                        onClick={async () => {
-                            if (isPending) return;
-                            if (!isEnrolled && onEnroll) {
-                                await onEnroll(course.id);
-                            } else if (isEnrolled) {
-                                router.push(`/${locale}/lms/course/${course.id}`);
-                            }
-                        }}
-                        className={`flex-1 font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm ${isPending
-                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-                            : course.visibility === 'cohort'
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
-                                : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
-                            }`}
-                    >
-                        {isPending ? '수강 승인 대기 중' : isEnrolled ? t('start_learning') : '수강 신청하기'}
-                        {!isPending && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
-                    </button>
-                    {(isEnrolled || isPending) && onUnenroll && (
-                        <button
-                            onClick={() => onUnenroll(course.id)}
-                            className="bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 font-bold px-4 py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center"
-                            title="수강 철회"
-                        >
-                            철회
-                        </button>
-                    )}
-                </div>
+                <button
+                    disabled={isPending}
+                    onClick={async () => {
+                        if (isPending) return;
+                        if (!isEnrolled && onEnroll) {
+                            await onEnroll(course.id);
+                        } else if (isEnrolled) {
+                            router.push(`/${locale}/lms/course/${course.id}`);
+                        }
+                    }}
+                    className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm ${isPending
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                        : course.visibility === 'cohort'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
+                            : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
+                        }`}
+                >
+                    {isPending ? '수강 승인 대기 중' : isEnrolled ? t('start_learning') : '수강 신청하기'}
+                    {!isPending && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
+                </button>
             </div>
         </div>
     );
