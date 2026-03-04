@@ -203,36 +203,32 @@ export default function LMSDashboard() {
     // "Available Courses" = public courses + cohort courses with no cohorts assigned
     const isStaffRole = userProfile && ['staff', 'admin', 'superuser'].includes(userProfile.role);
     const myCourses = filteredCourses.filter(c => {
-        // 1. Manually enrolled (active or pending) courses always go to My Courses
-        if (enrolledCourseIds.has(c.id) || pendingCourseIds.has(c.id)) return true;
-
-        // 2. Cohort-restricted courses where the student's cohort matches
-        if (c.visibility !== 'cohort') return false;
-        if (isStaffRole) return false;
-        if (!c.allowedCohorts || c.allowedCohorts.length === 0) return false;
-        if (userProfile && (
-            (userProfile.cohort_id && c.allowedCohorts.includes(userProfile.cohort_id)) ||
-            c.allowedCohorts.includes(userProfile.cohort)
-        )) return true;
-        return false;
+        // "My Courses" strictly means I have enrolled (active or pending)
+        return enrolledCourseIds.has(c.id) || pendingCourseIds.has(c.id);
     });
 
     const availableCourses = filteredCourses.filter(c => {
-        // If already in My Courses (enrolled/pending/assigned), don't show in Available
+        // If I already enrolled, it moves to My Courses
         if (enrolledCourseIds.has(c.id) || pendingCourseIds.has(c.id)) return false;
 
-        // Check for cohort assignment in available courses as well (to avoid duplication if logic changes)
-        const isAssigned = c.visibility === 'cohort' && userProfile && (
-            (userProfile.cohort_id && c.allowedCohorts?.includes(userProfile.cohort_id)) ||
-            c.allowedCohorts?.includes(userProfile.cohort)
-        );
-        if (isAssigned) return false;
-
+        // Public courses are always available
         if (c.visibility === 'public') return true;
+
+        // Cohort-restricted courses
         if (c.visibility === 'cohort') {
+            // Staff/Superusers see everything
             if (isStaffRole) return true;
+
+            // If no cohorts specified, it's open (fallback)
             if (!c.allowedCohorts || c.allowedCohorts.length === 0) return true;
+
+            // Otherwise, only show if student's cohort matches
+            if (userProfile && (
+                (userProfile.cohort_id && c.allowedCohorts.includes(userProfile.cohort_id)) ||
+                c.allowedCohorts.includes(userProfile.cohort)
+            )) return true;
         }
+
         return false;
     });
 
@@ -364,13 +360,26 @@ export default function LMSDashboard() {
 
                     {myCourses.length === 0 ? (
                         <div className="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-8 text-center">
-                            <p className="text-slate-400 text-sm font-medium italic">No courses specifically assigned to your cohort yet.</p>
+                            <p className="text-slate-400 text-sm font-medium italic">No enrolled courses yet.</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {myCourses.map(course => (
-                                <CourseCard key={course.id} course={course} t={t} locale={locale} router={router} isEnrolled={enrolledCourseIds.has(course.id)} isPending={pendingCourseIds.has(course.id)} onEnroll={handleEnroll} />
-                            ))}
+                            {myCourses.map(course => {
+                                const isEnrolled = enrolledCourseIds.has(course.id);
+                                const isPending = pendingCourseIds.has(course.id);
+                                return (
+                                    <CourseCard
+                                        key={course.id}
+                                        course={course}
+                                        t={t}
+                                        locale={locale}
+                                        router={router}
+                                        isEnrolled={isEnrolled}
+                                        isPending={isPending}
+                                        onEnroll={handleEnroll}
+                                    />
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -395,7 +404,7 @@ export default function LMSDashboard() {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {availableCourses.map(course => (
-                                <CourseCard key={course.id} course={course} t={t} locale={locale} router={router} isEnrolled={enrolledCourseIds.has(course.id)} isPending={pendingCourseIds.has(course.id)} onEnroll={handleEnroll} />
+                                <CourseCard key={course.id} course={course} t={t} locale={locale} router={router} onEnroll={handleEnroll} />
                             ))}
                         </div>
                     )}
