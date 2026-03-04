@@ -1736,6 +1736,97 @@ export default function CourseOutlineEditor() {
                         )}
                     </main>
                 )}
+
+                {cmsView === 'enrollments' && (
+                    <main className="flex-1 overflow-y-auto bg-slate-50 p-8 custom-scrollbar">
+                        <div className="max-w-4xl mx-auto">
+                            <div className="mb-8">
+                                <h2 className="text-2xl font-black text-slate-800">👥 수강 신청 관리 (Enrollments)</h2>
+                                <p className="text-slate-500">이 코스에 신청한 학생들의 목록입니다. 승인 대기 중인 학생을 수락하거나 거절할 수 있습니다.</p>
+                            </div>
+
+                            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50 border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Student</th>
+                                                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email</th>
+                                                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                                                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
+                                                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {courseEnrollments.map((enroll) => (
+                                                <tr key={enroll.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-bold text-slate-700">{enroll.profiles?.name || enroll.name || 'Unknown'}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-slate-500">{enroll.profiles?.email || enroll.email || 'N/A'}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${enroll.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                                                            enroll.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                                                                'bg-rose-100 text-rose-700'
+                                                            }`}>
+                                                            {enroll.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs text-slate-400">
+                                                        {new Date(enroll.created_at).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            {enroll.status === 'pending' && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            const supabase = createClient();
+                                                                            const { error } = await supabase.from('enrollments').update({ status: 'active' }).eq('id', enroll.id);
+                                                                            if (!error) {
+                                                                                setCourseEnrollments(prev => prev.map(e => e.id === enroll.id ? { ...e, status: 'active' } : e));
+                                                                            }
+                                                                        }}
+                                                                        className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors"
+                                                                    >승인</button>
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            if (!confirm("이 신청을 거절하시겠습니까?")) return;
+                                                                            const supabase = createClient();
+                                                                            const { error } = await supabase.from('enrollments').delete().eq('id', enroll.id);
+                                                                            if (!error) {
+                                                                                setCourseEnrollments(prev => prev.filter(e => e.id !== enroll.id));
+                                                                            }
+                                                                        }}
+                                                                        className="bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors"
+                                                                    >거절</button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {courseEnrollments.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic text-sm">신청한 학생이 없습니다.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                )}
+
+                {cmsView === 'grading' && (
+                    <main className="flex-1 overflow-y-auto bg-slate-50 p-8 custom-scrollbar">
+                        <div className="max-w-4xl mx-auto text-center py-20">
+                            <h2 className="text-2xl font-black text-slate-800 mb-2">📊 성적 관리 (Grading)</h2>
+                            <p className="text-slate-500">이 탭에서는 학생들의 퀴즈 참여 내역과 성적을 관리할 수 있습니다. (준비 중입니다)</p>
+                        </div>
+                    </main>
+                )}
             </div>
 
             {/* Asset Library Modal Overlay */}

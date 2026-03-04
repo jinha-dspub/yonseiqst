@@ -11,7 +11,8 @@
     "library_title": "콘텐츠 라이브러리",
     "library_desc": "문제 세트, 비디오, 텍스트 블록 등 재사용 가능한 학습 컴포넌트를 만들고 관리하여 여러 코스에서 사용할 수 있는 곳입니다.",
     "coming_soon": "새 컴포넌트 만들기 (준비중)",
-    "edit_outline": "개요 편집"
+    "edit_outline": "개요 편집",
+    "cohorts": "코호트 관리"
   },
   "Modal": {
     "create_title": "새 코스 만들기",

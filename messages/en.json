@@ -11,7 +11,8 @@
         "library_title": "Content Library",
         "library_desc": "This is where you will create, manage, and store reusable learning components like problem sets, video snippets, and text blocks to be used across multiple courses.",
         "coming_soon": "Create New Component (Coming Soon)",
-        "edit_outline": "Edit Outline"
+        "edit_outline": "Edit Outline",
+        "cohorts": "Cohorts"
     },
     "Modal": {
         "create_title": "Create New Course",

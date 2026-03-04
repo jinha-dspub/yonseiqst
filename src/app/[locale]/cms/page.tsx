@@ -203,8 +203,11 @@ export default function CMSDashboard() {
                 </div>
                 <div className="flex items-center gap-6">
                     <LanguageSwitcher />
-                    <Link href={`/${locale}/dashboard`} className="text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors">
+                    <Link href={`/${locale}/dashboard`} className="text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors text-nowrap">
                         {t('CMS.dashboard')}
+                    </Link>
+                    <Link href={`/${locale}/cms/cohorts`} className="text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors text-nowrap">
+                        {t('CMS.cohorts') || 'Cohorts'}
                     </Link>
                     <button
                         onClick={handleLogout}

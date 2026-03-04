@@ -48,7 +48,7 @@ export default function DashboardPage() {
             }
         }
 
-        setIsStaff(role === "staff" || role === "admin" || role === "superuser");
+        setIsStaff(role === "staff" || role === "admin" || role === "superuser" || role === "lecturer");
 
         // Fetch courses to find assigned ones
         const allCourses = await getCourses();

@@ -159,12 +159,19 @@ export default function LMSDashboard() {
 
         // Cohort-assigned courses auto-enroll as active. Public courses require approval (pending).
         const statusToSet = isCohortAssigned ? 'active' : 'pending';
+        console.log(`Setting enrollment for course ${courseId} to status: ${statusToSet}`);
 
-        await supabase.from('enrollments').upsert({
+        const { error } = await supabase.from('enrollments').upsert({
             user_id: userProfile.id,
             course_id: courseId,
             status: statusToSet
         }, { onConflict: 'user_id,course_id' });
+
+        if (error) {
+            console.error('Enrollment failed:', error);
+            alert(`수강 신청에 실패했습니다: ${error.message}`);
+            return;
+        }
 
         if (statusToSet === 'active') {
             setEnrolledCourseIds(prev => new Set([...prev, courseId]));
@@ -416,10 +423,10 @@ function CourseCard({ course, t, locale, router, isEnrolled, isPending, onEnroll
                         }
                     }}
                     className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm ${isPending
-                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-                            : course.visibility === 'cohort'
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
-                                : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                        : course.visibility === 'cohort'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
+                            : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
                         }`}
                 >
                     {isPending ? '수강 승인 대기 중' : isEnrolled ? t('start_learning') : '수강 신청하기'}
