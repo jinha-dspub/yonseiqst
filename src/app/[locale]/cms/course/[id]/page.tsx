@@ -722,26 +722,37 @@ export default function CourseOutlineEditor() {
                                         return;
                                     }
 
-                                    // 2. Fetch user details for these enrollments from the 'users' table
+                                    // 2. Fetch user details for these enrollments
                                     const userIds = enrollData.map(e => e.user_id);
-                                    const { data: userData, error: userError } = await supabase
+
+                                    // Try users table
+                                    const { data: userData } = await supabase
                                         .from('users')
                                         .select('id, name, email')
                                         .in('id', userIds);
 
-                                    if (userError) {
-                                        console.error('User fetch error:', userError);
-                                        // Still show enrollments even if user details fail
-                                        setCourseEnrollments(enrollData);
-                                    } else {
-                                        // Merge user data into enrollments
-                                        const userMap = new Map(userData?.map(u => [u.id, u]));
-                                        const enriched = enrollData.map(e => ({
-                                            ...e,
-                                            user: userMap.get(e.user_id)
-                                        }));
-                                        setCourseEnrollments(enriched);
-                                    }
+                                    // Try profiles table as well
+                                    const { data: profileData } = await supabase
+                                        .from('profiles')
+                                        .select('id, full_name, email')
+                                        .in('id', userIds);
+
+                                    // Merge user data into enrollments
+                                    const userMap = new Map();
+                                    userData?.forEach(u => userMap.set(u.id, { name: u.name, email: u.email }));
+                                    profileData?.forEach(p => {
+                                        const existing = userMap.get(p.id);
+                                        userMap.set(p.id, {
+                                            name: existing?.name || p.full_name,
+                                            email: existing?.email || p.email
+                                        });
+                                    });
+
+                                    const enriched = enrollData.map(e => ({
+                                        ...e,
+                                        user: userMap.get(e.user_id)
+                                    }));
+                                    setCourseEnrollments(enriched);
                                 }}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${cmsView === 'enrollments' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
                             >
