@@ -714,6 +714,7 @@ export default function CourseOutlineEditor() {
 
                                     if (enrollError) {
                                         console.error('Enrollment fetch error:', enrollError);
+                                        alert(`신청 목록을 불러오지 못했습니다: ${enrollError.message} (${enrollError.code})`);
                                         return;
                                     }
 
