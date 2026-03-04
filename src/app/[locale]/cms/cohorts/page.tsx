@@ -71,6 +71,8 @@ export default function CMSDashboard() {
   const [programAssignments, setProgramAssignments] = useState<string[]>([]);
   const [allMissions, setAllMissions] = useState<any[]>([]);
   const [processingUsers, setProcessingUsers] = useState<Set<string>>(new Set());
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
 
   // Initial Data Load with Auth check
   useEffect(() => {
@@ -594,63 +596,21 @@ export default function CMSDashboard() {
 
               <div className="grid lg:grid-cols-2 gap-6">
                 {/* STUDENTS BOX */}
-                <div className="border border-[var(--color-card-border)] rounded-lg bg-black/20 overflow-hidden flex flex-col h-[400px]">
-                  <div className="bg-black/40 px-4 py-3 border-b border-[var(--color-card-border)] flex justify-between items-center">
-                    <h4 className="font-bold text-emerald-400 text-sm">Enrolled Students</h4>
-                    <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full">{cohortMembers.length}</span>
+                <div className="border border-[var(--color-card-border)] rounded-lg bg-black/20 overflow-hidden flex flex-col items-center justify-center p-8 h-[400px]">
+                  <div className="bg-emerald-500/10 p-4 rounded-full mb-4">
+                    <span className="text-4xl">👨‍🎓</span>
                   </div>
-                  <div className="p-4 flex-grow overflow-y-auto custom-scrollbar">
-                    {cohortMembers.length === 0 && <div className="text-gray-500 text-xs italic text-center mt-4">No students enrolled yet. Add from the list below.</div>}
-                    <div className="space-y-2">
-                      {cohortMembers.map(m => {
-                        if (!m) return null;
-                        return (
-                          <div key={m.id} className="flex justify-between items-center p-2 bg-black/50 border border-[var(--color-card-border)]/50 rounded-md text-sm">
-                            <div className="flex flex-col truncate pr-2">
-                              <span className="font-medium text-emerald-400 truncate text-xs">
-                                {m.name || "Unknown"}
-                                <span className="text-[8px] text-gray-500 font-normal ml-1">({students.find(s => s.id === m.id)?.cohort || '...'})</span>
-                              </span>
-                              <span className="text-[10px] text-gray-400 font-mono truncate">{m.email}</span>
-                            </div>
-                            <button
-                              onClick={() => handleRemoveStudentFromCohort(m.id)}
-                              disabled={processingUsers.has(m.id)}
-                              className="text-[10px] text-red-400 hover:text-red-300 uppercase tracking-wider font-bold disabled:opacity-50"
-                            >
-                              {processingUsers.has(m.id) ? 'Saving...' : 'Remove'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="border-t border-[var(--color-card-border)] p-3 bg-black/40">
-                    <div className="text-xs font-semibold text-gray-400 mb-2">Available Database Students:</div>
-                    <div className="max-h-24 overflow-y-auto custom-scrollbar space-y-1">
-                      {students.map(s => {
-                        if (cohortMembers.some(m => m.id === s.id)) return null;
-                        return (
-                          <div key={s.id} className="flex justify-between items-center bg-black/30 border border-white/5 p-1.5 rounded">
-                            <div className="flex flex-col truncate pr-2">
-                              <span className="text-[10px] text-gray-200 truncate font-bold">
-                                {s.name || "Unknown"}
-                                <span className="text-[8px] text-gray-500 font-normal ml-1">({s.cohort || 'DEFAULT'})</span>
-                              </span>
-                              <span className="text-[9px] text-gray-500 font-mono truncate">{s.email}</span>
-                            </div>
-                            <button
-                              onClick={() => handleAddStudentToCohort(s.id)}
-                              disabled={processingUsers.has(s.id)}
-                              className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded hover:bg-emerald-500/20 whitespace-nowrap disabled:opacity-50"
-                            >
-                              {processingUsers.has(s.id) ? '...' : 'Add'}
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+                  <h4 className="font-bold text-emerald-400 text-lg mb-2">Student Enrollment</h4>
+                  <p className="text-gray-400 text-sm text-center mb-6">Manage enrolled students for this cohort. Currently {cohortMembers.length} students enrolled.</p>
+                  <button
+                    onClick={() => {
+                      setStudentSearchQuery("");
+                      setShowStudentModal(true);
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-emerald-900/20 flex items-center gap-2"
+                  >
+                    Manage Students
+                  </button>
                 </div>
 
                 {/* LECTURERS BOX */}
@@ -778,6 +738,143 @@ export default function CMSDashboard() {
                 className="px-4 py-2 text-sm font-bold text-white bg-orange-600/80 hover:bg-orange-500 rounded-lg shadow-[0_0_15px_rgba(249,115,22,0.3)] transition-all disabled:opacity-30 disabled:shadow-none"
               >
                 Delete Cohort
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STUDENT MANAGEMENT MODAL */}
+      {showStudentModal && selectedCohort && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md px-4 py-10">
+          <div className="bg-[var(--color-card)] rounded-2xl border border-[var(--color-card-border)] w-full max-w-5xl h-full flex flex-col shadow-2xl relative overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-[var(--color-card-border)] bg-black/20 flex flex-col gap-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                    <span className="bg-emerald-500/20 text-emerald-400 p-2 rounded-lg">👨‍🎓</span>
+                    Manage Students: {selectedCohort.name}
+                  </h3>
+                  <p className="text-gray-400 text-sm mt-1">{selectedProgram?.name} — Student Hub</p>
+                </div>
+                <button
+                  onClick={() => setShowStudentModal(false)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by name or email..."
+                  value={studentSearchQuery}
+                  onChange={(e) => setStudentSearchQuery(e.target.value)}
+                  className="w-full bg-black/40 border border-[var(--color-card-border)] rounded-xl px-12 py-3 text-white focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all"
+                  autoFocus
+                />
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Content - Dual Lists */}
+            <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
+              {/* Enrolled Students (Left/Top) */}
+              <div className="flex-1 border-r border-[var(--color-card-border)] flex flex-col overflow-hidden">
+                <div className="px-6 py-3 bg-emerald-500/5 flex items-center justify-between border-b border-[var(--color-card-border)]">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-emerald-400">Enrolled In Cohort</h4>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">{cohortMembers.length}</span>
+                </div>
+                <div className="flex-grow overflow-y-auto p-4 custom-scrollbar space-y-2">
+                  {cohortMembers
+                    .filter(m =>
+                      !studentSearchQuery ||
+                      m.name?.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+                      m.email?.toLowerCase().includes(studentSearchQuery.toLowerCase())
+                    )
+                    .map(m => (
+                      <div key={m.id} className="flex justify-between items-center p-3 bg-black/40 border border-emerald-500/20 rounded-xl group hover:border-emerald-500/40 transition-all">
+                        <div className="flex flex-col truncate pr-4">
+                          <span className="font-bold text-white text-sm truncate">{m.name || "Unknown User"}</span>
+                          <span className="text-xs text-emerald-400/70 font-mono truncate">{m.email}</span>
+                          <span className="text-[9px] text-gray-500 uppercase font-black tracking-tighter mt-1">Cohort: {students.find(s => s.id === m.id)?.cohort || '...'}</span>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveStudentFromCohort(m.id)}
+                          disabled={processingUsers.has(m.id)}
+                          className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-30 flex-shrink-0"
+                        >
+                          {processingUsers.has(m.id) ? 'Saving...' : 'Remove'}
+                        </button>
+                      </div>
+                    ))}
+                  {cohortMembers.length === 0 && (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-500 p-8 text-center opacity-50">
+                      <span className="text-3xl mb-2">🔭</span>
+                      <p className="text-sm">No students in this cohort yet.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Available Database Students (Right/Bottom) */}
+              <div className="flex-1 flex flex-col overflow-hidden bg-black/10">
+                <div className="px-6 py-3 bg-gray-500/5 flex items-center justify-between border-b border-[var(--color-card-border)]">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Available Database Students</h4>
+                  <span className="text-[10px] bg-gray-500/20 text-gray-400 px-2 py-0.5 rounded-full font-bold">
+                    {students.filter(s => !cohortMembers.some(m => m.id === s.id)).length}
+                  </span>
+                </div>
+                <div className="flex-grow overflow-y-auto p-4 custom-scrollbar space-y-2">
+                  {students
+                    .filter(s => !cohortMembers.some(m => m.id === s.id))
+                    .filter(s =>
+                      !studentSearchQuery ||
+                      s.name?.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+                      s.email?.toLowerCase().includes(studentSearchQuery.toLowerCase())
+                    )
+                    .map(s => (
+                      <div key={s.id} className="flex justify-between items-center p-3 bg-black/20 border border-white/5 rounded-xl group hover:border-[var(--color-primary)]/40 transition-all">
+                        <div className="flex flex-col truncate pr-4 text-left">
+                          <span className="font-bold text-gray-200 text-sm truncate">{s.name || "Unknown User"}</span>
+                          <span className="text-xs text-gray-500 font-mono truncate">{s.email}</span>
+                          <span className="text-[9px] text-gray-500 uppercase font-black tracking-tighter mt-1">Current: {s.cohort || 'DEFAULT'}</span>
+                        </div>
+                        <button
+                          onClick={() => handleAddStudentToCohort(s.id)}
+                          disabled={processingUsers.has(s.id)}
+                          className="px-3 py-1.5 rounded-lg bg-[var(--color-primary)]/10 hover:bg-[var(--color-primary)] text-[var(--color-primary)] hover:text-white text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-30 flex-shrink-0"
+                        >
+                          {processingUsers.has(s.id) ? '...' : 'Add'}
+                        </button>
+                      </div>
+                    ))}
+                  {students.filter(s => !cohortMembers.some(m => m.id === s.id)).length === 0 && (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-500 p-8 text-center opacity-50">
+                      <span className="text-3xl mb-2">🎉</span>
+                      <p className="text-sm">All students are already enrolled.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-[var(--color-card-border)] bg-black/40 flex justify-end">
+              <button
+                onClick={() => setShowStudentModal(false)}
+                className="px-6 py-2 bg-white text-black font-bold rounded-lg hover:bg-emerald-400 transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>
