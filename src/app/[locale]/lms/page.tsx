@@ -68,10 +68,20 @@ export default function LMSDashboard() {
             sessionStorage.setItem("currentUser", JSON.stringify(profile));
 
             // Load enrollments
-            const { data: enrollData } = await supabase.from('enrollments').select('course_id, status').eq('user_id', user.id).in('status', ['active', 'pending']);
+            const { data: enrollData } = await supabase.from('enrollments').select('*').eq('user_id', user.id).in('status', ['active', 'pending']);
             if (enrollData) {
                 setEnrolledCourseIds(new Set(enrollData.filter(e => e.status === 'active').map(e => e.course_id)));
                 setPendingCourseIds(new Set(enrollData.filter(e => e.status === 'pending').map(e => e.course_id)));
+
+                // Auto-sync missing name/email to existing enrollments
+                for (const enroll of enrollData) {
+                    if (!enroll.name || !enroll.email) {
+                        await supabase.from('enrollments').update({
+                            name: profile.name,
+                            email: profile.email
+                        }).eq('id', enroll.id);
+                    }
+                }
             }
 
             // Load unread notifications
