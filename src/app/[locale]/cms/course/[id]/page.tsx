@@ -1853,6 +1853,21 @@ export default function CourseOutlineEditor() {
                                                                     >거절</button>
                                                                 </>
                                                             )}
+                                                            {enroll.status === 'active' && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!confirm("정말로 이 학생의 수강을 철회시키겠습니까?")) return;
+                                                                        const supabase = createClient();
+                                                                        const { error } = await supabase.from('enrollments').delete().eq('id', enroll.id);
+                                                                        if (error) {
+                                                                            alert(`철회 실패: ${error.message}`);
+                                                                        } else {
+                                                                            setCourseEnrollments(prev => prev.filter(e => e.id !== enroll.id));
+                                                                        }
+                                                                    }}
+                                                                    className="bg-slate-500 hover:bg-slate-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors"
+                                                                >철회</button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>

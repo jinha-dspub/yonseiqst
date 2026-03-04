@@ -199,6 +199,37 @@ export default function LMSDashboard() {
         }
     };
 
+    const handleUnenroll = async (courseId: string) => {
+        if (!userProfile) return;
+
+        if (!confirm('정말로 이 수강 신청을 철회하시겠습니까? 관련 데이터가 삭제될 수 있습니다.')) return;
+
+        const { error } = await supabase
+            .from('enrollments')
+            .delete()
+            .eq('user_id', userProfile.id)
+            .eq('course_id', courseId);
+
+        if (error) {
+            console.error('Unenrollment failed:', error);
+            alert(`수강 철회에 실패했습니다: ${error.message}`);
+            return;
+        }
+
+        setEnrolledCourseIds(prev => {
+            const next = new Set(prev);
+            next.delete(courseId);
+            return next;
+        });
+        setPendingCourseIds(prev => {
+            const next = new Set(prev);
+            next.delete(courseId);
+            return next;
+        });
+
+        alert('수강 철회가 완료되었습니다.');
+    };
+
     // "My Courses" = cohort-restricted courses where the student's cohort IS assigned
     // "Available Courses" = public courses + cohort courses with no cohorts assigned
     const isStaffRole = userProfile && ['staff', 'admin', 'superuser'].includes(userProfile.role);
@@ -377,6 +408,7 @@ export default function LMSDashboard() {
                                         isEnrolled={isEnrolled}
                                         isPending={isPending}
                                         onEnroll={handleEnroll}
+                                        onUnenroll={handleUnenroll}
                                     />
                                 );
                             })}
@@ -415,7 +447,11 @@ export default function LMSDashboard() {
 }
 
 // Sub-component for course card
-function CourseCard({ course, t, locale, router, isEnrolled, isPending, onEnroll }: { course: Course, t: any, locale: string, router: any, isEnrolled?: boolean, isPending?: boolean, onEnroll?: (courseId: string) => void }) {
+function CourseCard({
+    course, t, locale, router, isEnrolled, isPending, onEnroll, onUnenroll
+}: {
+    course: Course, t: any, locale: string, router: any, isEnrolled?: boolean, isPending?: boolean, onEnroll?: (courseId: string) => void, onUnenroll?: (courseId: string) => void
+}) {
     return (
         <div key={course.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-xl hover:border-blue-300 transition-all group flex flex-col h-full shadow-sm">
             <div
@@ -451,26 +487,37 @@ function CourseCard({ course, t, locale, router, isEnrolled, isPending, onEnroll
                     {course.description || t('no_desc')}
                 </p>
 
-                <button
-                    disabled={isPending}
-                    onClick={async () => {
-                        if (isPending) return;
-                        if (!isEnrolled && onEnroll) {
-                            await onEnroll(course.id);
-                        } else if (isEnrolled) {
-                            router.push(`/${locale}/lms/course/${course.id}`);
-                        }
-                    }}
-                    className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm ${isPending
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-                        : course.visibility === 'cohort'
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
-                            : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
-                        }`}
-                >
-                    {isPending ? '수강 승인 대기 중' : isEnrolled ? t('start_learning') : '수강 신청하기'}
-                    {!isPending && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        disabled={isPending}
+                        onClick={async () => {
+                            if (isPending) return;
+                            if (!isEnrolled && onEnroll) {
+                                await onEnroll(course.id);
+                            } else if (isEnrolled) {
+                                router.push(`/${locale}/lms/course/${course.id}`);
+                            }
+                        }}
+                        className={`flex-1 font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm ${isPending
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                            : course.visibility === 'cohort'
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
+                                : 'bg-slate-900 hover:bg-blue-600 text-white shadow-slate-100'
+                            }`}
+                    >
+                        {isPending ? '수강 승인 대기 중' : isEnrolled ? t('start_learning') : '수강 신청하기'}
+                        {!isPending && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
+                    </button>
+                    {(isEnrolled || isPending) && onUnenroll && (
+                        <button
+                            onClick={() => onUnenroll(course.id)}
+                            className="bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 font-bold px-4 py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center"
+                            title="수강 철회"
+                        >
+                            철회
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
