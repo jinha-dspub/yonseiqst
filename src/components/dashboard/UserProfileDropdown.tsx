@@ -136,7 +136,7 @@ export default function UserProfileDropdown({ userProfile: initialProfile }: { u
                                     Profile
                                 </button>
 
-                                {['staff', 'admin', 'superuser'].includes(userProfile.role) && (
+                                {['staff', 'admin', 'superuser', 'lecturer'].includes(userProfile.role) && (
                                     <>
                                         <div className="h-px bg-slate-100 my-1 mx-2"></div>
                                         <p className="px-5 py-1 text-[10px] text-emerald-600 uppercase font-bold tracking-widest mt-1">Admin Tools</p>
