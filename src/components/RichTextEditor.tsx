@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { Eye, Code, Edit3, ImagePlus, X, FileCode2, Hash } from 'lucide-react';
+import { Eye, Code, Edit3, ImagePlus, X, FileCode2, Hash, Image as ImageIcon } from 'lucide-react';
 
 interface RichTextEditorProps {
     value: string;
