@@ -703,12 +703,45 @@ export default function CourseOutlineEditor() {
                             <button
                                 onClick={async () => {
                                     setCmsView('enrollments');
-                                    const { data } = await createClient()
+                                    const supabase = createClient();
+
+                                    // 1. Fetch enrollments for this course
+                                    const { data: enrollData, error: enrollError } = await supabase
                                         .from('enrollments')
-                                        .select('*, profiles(full_name, email)')
+                                        .select('*')
                                         .eq('course_id', courseId)
                                         .order('created_at', { ascending: false });
-                                    if (data) setCourseEnrollments(data);
+
+                                    if (enrollError) {
+                                        console.error('Enrollment fetch error:', enrollError);
+                                        return;
+                                    }
+
+                                    if (!enrollData || enrollData.length === 0) {
+                                        setCourseEnrollments([]);
+                                        return;
+                                    }
+
+                                    // 2. Fetch user details for these enrollments from the 'users' table
+                                    const userIds = enrollData.map(e => e.user_id);
+                                    const { data: userData, error: userError } = await supabase
+                                        .from('users')
+                                        .select('id, name, email')
+                                        .in('id', userIds);
+
+                                    if (userError) {
+                                        console.error('User fetch error:', userError);
+                                        // Still show enrollments even if user details fail
+                                        setCourseEnrollments(enrollData);
+                                    } else {
+                                        // Merge user data into enrollments
+                                        const userMap = new Map(userData?.map(u => [u.id, u]));
+                                        const enriched = enrollData.map(e => ({
+                                            ...e,
+                                            user: userMap.get(e.user_id)
+                                        }));
+                                        setCourseEnrollments(enriched);
+                                    }
                                 }}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${cmsView === 'enrollments' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}
                             >
@@ -1761,9 +1794,9 @@ export default function CourseOutlineEditor() {
                                             {courseEnrollments.map((enroll) => (
                                                 <tr key={enroll.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="px-6 py-4">
-                                                        <div className="font-bold text-slate-700">{enroll.profiles?.name || enroll.name || 'Unknown'}</div>
+                                                        <div className="font-bold text-slate-700">{enroll.user?.name || enroll.profiles?.name || enroll.name || 'Unknown'}</div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-sm text-slate-500">{enroll.profiles?.email || enroll.email || 'N/A'}</td>
+                                                    <td className="px-6 py-4 text-sm text-slate-500">{enroll.user?.email || enroll.profiles?.email || enroll.email || 'N/A'}</td>
                                                     <td className="px-6 py-4">
                                                         <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${enroll.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
                                                             enroll.status === 'pending' ? 'bg-amber-100 text-amber-700' :
@@ -1783,7 +1816,9 @@ export default function CourseOutlineEditor() {
                                                                         onClick={async () => {
                                                                             const supabase = createClient();
                                                                             const { error } = await supabase.from('enrollments').update({ status: 'active' }).eq('id', enroll.id);
-                                                                            if (!error) {
+                                                                            if (error) {
+                                                                                alert(`승인 실패: ${error.message}`);
+                                                                            } else {
                                                                                 setCourseEnrollments(prev => prev.map(e => e.id === enroll.id ? { ...e, status: 'active' } : e));
                                                                             }
                                                                         }}
@@ -1794,7 +1829,9 @@ export default function CourseOutlineEditor() {
                                                                             if (!confirm("이 신청을 거절하시겠습니까?")) return;
                                                                             const supabase = createClient();
                                                                             const { error } = await supabase.from('enrollments').delete().eq('id', enroll.id);
-                                                                            if (!error) {
+                                                                            if (error) {
+                                                                                alert(`거절 실패: ${error.message}`);
+                                                                            } else {
                                                                                 setCourseEnrollments(prev => prev.filter(e => e.id !== enroll.id));
                                                                             }
                                                                         }}
