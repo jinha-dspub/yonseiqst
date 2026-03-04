@@ -10,11 +10,12 @@ import { Eye, Code, Edit3, ImagePlus, X, FileCode2, Hash } from 'lucide-react';
 interface RichTextEditorProps {
     value: string;
     onChange: (value: string) => void;
+    onBrowseAssets?: () => void;
 }
 
 type EditorMode = 'visual' | 'markdown' | 'preview' | 'html';
 
-export default function RichTextEditor({ value, onChange }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, onBrowseAssets }: RichTextEditorProps) {
     const [mode, setMode] = useState<EditorMode>('markdown');
     const [showImageDialog, setShowImageDialog] = useState(false);
     const [imageUrl, setImageUrl] = useState('');
@@ -84,11 +85,10 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
                         <button
                             key={tab.id}
                             onClick={() => handleModeSwitch(tab.id)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                                mode === tab.id
-                                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-                            }`}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === tab.id
+                                ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                                }`}
                         >
                             {tab.icon} {tab.label}
                         </button>
@@ -113,13 +113,24 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
                         </button>
                     </div>
                     <div className="flex gap-2">
-                        <input
-                            type="text"
-                            placeholder="이미지 URL (https://...)"
-                            className="flex-1 p-2.5 bg-white border border-purple-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-purple-500"
-                            value={imageUrl}
-                            onChange={(e) => setImageUrl(e.target.value)}
-                        />
+                        <div className="flex-1 flex gap-2">
+                            <input
+                                type="text"
+                                placeholder="이미지 URL (https://...)"
+                                className="flex-1 p-2.5 bg-white border border-purple-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-purple-500"
+                                value={imageUrl}
+                                onChange={(e) => setImageUrl(e.target.value)}
+                            />
+                            {onBrowseAssets && (
+                                <button
+                                    onClick={onBrowseAssets}
+                                    className="px-3 bg-purple-100 text-purple-700 text-xs font-bold rounded-lg hover:bg-purple-200 transition-all flex items-center gap-1 shrink-0"
+                                    title="미디어 라이브러리 열기"
+                                >
+                                    <ImageIcon size={14} /> 보관함
+                                </button>
+                            )}
+                        </div>
                         <input
                             type="text"
                             placeholder="대체 텍스트"
@@ -180,7 +191,7 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
                         }}
                         config={{
                             toolbar: [
-                                'heading', '|', 
+                                'heading', '|',
                                 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', '|',
                                 'insertTable', '|',
                                 'undo', 'redo'

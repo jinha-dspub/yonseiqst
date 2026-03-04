@@ -567,9 +567,9 @@ export default function LMSCoursePlayer() {
                                                                                                     title={comp.title || comp.content}
                                                                                                 >
                                                                                                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${comp.type === 'html' ? 'bg-blue-400' :
-                                                                                                            comp.type === 'video' ? 'bg-red-400' :
-                                                                                                                comp.type === 'embed' ? 'bg-purple-400' :
-                                                                                                                    comp.type === 'quiz' ? 'bg-amber-400' : 'bg-slate-400'
+                                                                                                        comp.type === 'video' ? 'bg-red-400' :
+                                                                                                            comp.type === 'embed' ? 'bg-purple-400' :
+                                                                                                                comp.type === 'quiz' ? 'bg-amber-400' : 'bg-slate-400'
                                                                                                         }`}></span>
                                                                                                     <span className="font-bold uppercase tracking-wider text-[9px] w-8 flex-shrink-0 text-slate-400">
                                                                                                         {comp.type === 'html' ? 'TXT' :
@@ -1016,6 +1016,22 @@ export default function LMSCoursePlayer() {
                                                                 >
                                                                     Download Document
                                                                 </a>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {comp.type === 'image' && (
+                                                    <div className="flex flex-col items-center justify-center w-full">
+                                                        {comp.content ? (
+                                                            <img
+                                                                src={comp.content}
+                                                                alt={comp.title || 'Course Image'}
+                                                                className="max-w-full h-auto rounded-2xl shadow-md border border-slate-100"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-48 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400">
+                                                                <ImageIcon size={48} className="opacity-20" />
                                                             </div>
                                                         )}
                                                     </div>

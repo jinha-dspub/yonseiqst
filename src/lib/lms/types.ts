@@ -1,4 +1,4 @@
-export type ComponentType = 'html' | 'video' | 'quiz' | 'document' | 'embed';
+export type ComponentType = 'html' | 'video' | 'quiz' | 'document' | 'embed' | 'image';
 
 export interface BaseEntity {
     id: string;

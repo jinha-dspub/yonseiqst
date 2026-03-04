@@ -468,6 +468,20 @@ export default function CourseOutlineEditor() {
         saveCourse({ ...course, sections: newSections });
     };
 
+    const addImageComponent = () => {
+        if (!course || selectedSecIdx === -1) return;
+        const newSections = [...course.sections];
+        const unit = newSections[selectedSecIdx].subsections[selectedSubIdx].units[selectedUnitIdx];
+        const newComp: UnitComponent = {
+            id: `comp-${Date.now()}`,
+            title: 'New Image',
+            type: 'image',
+            content: '',
+        };
+        unit.components.push(newComp);
+        saveCourse({ ...course, sections: newSections });
+    };
+
     const toggleComponentCollapse = (compId: string) => {
         setCollapsedComponents(prev => {
             const next = new Set(prev);
@@ -1422,6 +1436,7 @@ export default function CourseOutlineEditor() {
                                                                     <RichTextEditorWrapper
                                                                         value={comp.content}
                                                                         onChange={(newVal) => updateComponent(comp.id, { content: newVal })}
+                                                                        onBrowseAssets={() => setShowAssetLibrary({ isOpen: true, targetCompId: comp.id })}
                                                                     />
                                                                 </div>
                                                             </div>
@@ -1552,6 +1567,52 @@ export default function CourseOutlineEditor() {
                                                                     placeholder="https://docs.google.com/document/d/e/.../pub"
                                                                 />
                                                                 <p className="text-xs text-slate-400 mt-1">This URL will be embedded directly into the course page as an interactive iFrame.</p>
+                                                            </div>
+                                                        )}
+
+                                                        {comp.type === 'image' && (
+                                                            <div className="flex flex-col gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Image Source</label>
+                                                                {comp.content ? (
+                                                                    <div className="flex flex-col gap-3">
+                                                                        <div className="relative group max-w-sm overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                                                            <img src={comp.content} alt={comp.title} className="w-full h-auto object-contain max-h-48" />
+                                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                                <button
+                                                                                    onClick={() => setShowAssetLibrary({ isOpen: true, targetCompId: comp.id })}
+                                                                                    className="bg-white text-slate-800 font-bold px-4 py-2 rounded-lg text-xs shadow-lg hover:bg-slate-50 transition-colors"
+                                                                                >
+                                                                                    Change Image
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex flex-col gap-1.5">
+                                                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Image URL</label>
+                                                                            <div className="flex gap-2">
+                                                                                <input
+                                                                                    type="text"
+                                                                                    className="flex-1 bg-white border border-slate-200 rounded p-2 text-xs text-slate-600 focus:outline-none"
+                                                                                    value={comp.content}
+                                                                                    onChange={(e) => updateComponent(comp.id, { content: e.target.value })}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-8 bg-white text-center">
+                                                                        <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-3">
+                                                                            <ImageIcon size={20} />
+                                                                        </div>
+                                                                        <p className="text-sm font-semibold text-slate-700 mb-1">No image selected</p>
+                                                                        <p className="text-xs text-slate-500 mb-4">Select or upload an image from your library.</p>
+                                                                        <button
+                                                                            onClick={() => setShowAssetLibrary({ isOpen: true, targetCompId: comp.id })}
+                                                                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow-sm text-sm transition-colors flex items-center gap-2"
+                                                                        >
+                                                                            <ImageIcon size={16} /> Browse Library
+                                                                        </button>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
 
@@ -1750,6 +1811,12 @@ export default function CourseOutlineEditor() {
                                             <Plus size={18} /> HTML Text
                                         </button>
                                         <button
+                                            onClick={() => addImageComponent()}
+                                            className="bg-white border-2 border-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
+                                        >
+                                            <ImageIcon size={18} /> Image
+                                        </button>
+                                        <button
                                             onClick={() => addComponent('video')}
                                             className="bg-white border-2 border-slate-200 hover:border-red-500 hover:text-red-600 text-slate-600 font-bold px-5 py-3 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm hover:shadow-md"
                                         >
@@ -1901,7 +1968,17 @@ export default function CourseOutlineEditor() {
                     onClose={() => setShowAssetLibrary({ isOpen: false, targetCompId: null })}
                     onSelectOption={(url) => {
                         if (showAssetLibrary.targetCompId) {
-                            updateComponent(showAssetLibrary.targetCompId, { content: url });
+                            const comp = selectedUnitData?.components.find(c => c.id === showAssetLibrary.targetCompId);
+                            if (comp?.type === 'html') {
+                                // If it's an HTML component, we want to update the URL in the Image Insertion dialog if possible,
+                                // but for now, we'll just append it as a markdown image if it's markdown mode, 
+                                // or just provide the URL for manual insertion.
+                                // A better way is to integrate it into the RichTextEditor's internal state.
+                                // For now, let's just update the content or alert the user.
+                                updateComponent(showAssetLibrary.targetCompId, { content: comp.content + `\n![image](${url})\n` });
+                            } else {
+                                updateComponent(showAssetLibrary.targetCompId, { content: url });
+                            }
                         }
                         setShowAssetLibrary({ isOpen: false, targetCompId: null });
                     }}
