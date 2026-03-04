@@ -709,8 +709,7 @@ export default function CourseOutlineEditor() {
                                     const { data: enrollData, error: enrollError } = await supabase
                                         .from('enrollments')
                                         .select('*')
-                                        .eq('course_id', courseId)
-                                        .order('created_at', { ascending: false });
+                                        .eq('course_id', courseId);
 
                                     if (enrollError) {
                                         console.error('Enrollment fetch error:', enrollError);
@@ -1787,7 +1786,6 @@ export default function CourseOutlineEditor() {
                                                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Student</th>
                                                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email</th>
                                                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                                                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
                                                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
                                             </tr>
                                         </thead>
@@ -1805,9 +1803,6 @@ export default function CourseOutlineEditor() {
                                                             }`}>
                                                             {enroll.status}
                                                         </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-xs text-slate-400">
-                                                        {new Date(enroll.created_at).toLocaleDateString()}
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex justify-end gap-2">
@@ -1846,7 +1841,7 @@ export default function CourseOutlineEditor() {
                                             ))}
                                             {courseEnrollments.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic text-sm">신청한 학생이 없습니다.</td>
+                                                    <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic text-sm">신청한 학생이 없습니다.</td>
                                                 </tr>
                                             )}
                                         </tbody>
