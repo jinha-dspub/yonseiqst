@@ -5,7 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
     ChevronRight, ChevronDown, BookOpen, Menu, Clock, X,
-    CheckCircle2, Circle, PlayCircle, FileText, ListTodo, ArrowLeft, ArrowRight, Megaphone
+    CheckCircle2, Circle, PlayCircle, FileText, ListTodo, ArrowLeft, ArrowRight, Megaphone,
+    Image as ImageIcon
 } from 'lucide-react';
 import { Course, Section, Subsection, Unit, UnitComponent } from '@/lib/lms/types';
 import { getMockCourse } from '@/lib/lms/mockData';
