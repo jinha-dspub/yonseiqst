@@ -203,9 +203,12 @@ export default function LMSDashboard() {
     // "Available Courses" = public courses + cohort courses with no cohorts assigned
     const isStaffRole = userProfile && ['staff', 'admin', 'superuser'].includes(userProfile.role);
     const myCourses = filteredCourses.filter(c => {
+        // 1. Manually enrolled (active or pending) courses always go to My Courses
+        if (enrolledCourseIds.has(c.id) || pendingCourseIds.has(c.id)) return true;
+
+        // 2. Cohort-restricted courses where the student's cohort matches
         if (c.visibility !== 'cohort') return false;
         if (isStaffRole) return false;
-        // Must have cohorts assigned AND student's cohort must be in the list
         if (!c.allowedCohorts || c.allowedCohorts.length === 0) return false;
         if (userProfile && (
             (userProfile.cohort_id && c.allowedCohorts.includes(userProfile.cohort_id)) ||
@@ -213,12 +216,21 @@ export default function LMSDashboard() {
         )) return true;
         return false;
     });
+
     const availableCourses = filteredCourses.filter(c => {
+        // If already in My Courses (enrolled/pending/assigned), don't show in Available
+        if (enrolledCourseIds.has(c.id) || pendingCourseIds.has(c.id)) return false;
+
+        // Check for cohort assignment in available courses as well (to avoid duplication if logic changes)
+        const isAssigned = c.visibility === 'cohort' && userProfile && (
+            (userProfile.cohort_id && c.allowedCohorts?.includes(userProfile.cohort_id)) ||
+            c.allowedCohorts?.includes(userProfile.cohort)
+        );
+        if (isAssigned) return false;
+
         if (c.visibility === 'public') return true;
         if (c.visibility === 'cohort') {
-            // Staff sees all cohort courses here
             if (isStaffRole) return true;
-            // No cohorts assigned = available to everyone
             if (!c.allowedCohorts || c.allowedCohorts.length === 0) return true;
         }
         return false;
