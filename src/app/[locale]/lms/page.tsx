@@ -164,7 +164,9 @@ export default function LMSDashboard() {
         const { error } = await supabase.from('enrollments').upsert({
             user_id: userProfile.id,
             course_id: courseId,
-            status: statusToSet
+            status: statusToSet,
+            name: userProfile.name,
+            email: userProfile.email
         }, { onConflict: 'user_id,course_id' });
 
         if (error) {

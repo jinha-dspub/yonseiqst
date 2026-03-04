@@ -1793,7 +1793,7 @@ export default function CourseOutlineEditor() {
                                             {courseEnrollments.map((enroll) => (
                                                 <tr key={enroll.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="px-6 py-4">
-                                                        <div className="font-bold text-slate-700">{enroll.user?.name || enroll.profiles?.name || enroll.name || 'Unknown'}</div>
+                                                        <div className="font-bold text-slate-700">{enroll.user?.name || enroll.profiles?.name || enroll.name || `User (${enroll.user_id.substring(0, 8)})`}</div>
                                                     </td>
                                                     <td className="px-6 py-4 text-sm text-slate-500">{enroll.user?.email || enroll.profiles?.email || enroll.email || 'N/A'}</td>
                                                     <td className="px-6 py-4">
