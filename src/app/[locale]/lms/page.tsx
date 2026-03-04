@@ -38,7 +38,13 @@ export default function LMSDashboard() {
             }
 
             // Get user's cohort from the database
-            const { data: userData } = await supabase.from("users").select("role, name, cohort, cohort_id").eq("id", user.id).maybeSingle();
+            const { data: userData, error: userFetchError } = await supabase.from("users").select("role, name, cohort, cohort_id").eq("id", user.id).maybeSingle();
+
+            if (userFetchError) {
+                console.error('User role fetch error:', userFetchError);
+                alert(`권한 정보를 불러오지 못했습니다: ${userFetchError.message}`);
+            }
+
             const role = userData?.role || "student";
             const cohort = userData?.cohort || "DEFAULT";
             let cohortId = userData?.cohort_id || null;

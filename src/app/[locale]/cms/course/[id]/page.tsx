@@ -262,7 +262,14 @@ export default function CourseOutlineEditor() {
                 return;
             }
 
-            const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
+            // Get user's cohort from the database
+            const { data: userData, error: userFetchError } = await supabase.from("users").select("role, name, cohort, cohort_id").eq("id", user.id).maybeSingle();
+
+            if (userFetchError) {
+                console.error('User role fetch error:', userFetchError);
+                alert(`권한 정보를 불러오지 못했습니다: ${userFetchError.message}. RLS 설정을 확인해주세요.`);
+            }
+
             const role = userData?.role || "student";
 
             if (role === 'student') {
