@@ -73,6 +73,12 @@ export default function QuizRenderer({ content, componentId, courseId, onComplet
             return { ...base, type: 'multiple_choice', options: q.options || [], answer: q.answer_data?.answer ?? 0 } as QuizProblem;
         } else if (q.type === 'short_answer') {
             return { ...base, type: 'short_answer', acceptable_answers: q.answer_data?.acceptable_answers || [] } as QuizProblem;
+        } else if (q.type === 'assignment') {
+            const assignment = q.answer_data || {};
+            const extra = ['html', 'qmd', 'zip', 'pdf', 'jpg', 'png', 'docx'];
+            let allowed = assignment.allowedFileTypes || [];
+            allowed = Array.from(new Set([...allowed, ...extra]));
+            return { ...base, type: 'assignment', allowedFileTypes: allowed, maxFileSize: assignment.maxFileSize || 10, requireText: false, min_length: 0 } as QuizProblem;
         } else {
             return { ...base, type: 'descriptive', min_length: q.answer_data?.min_length, keywords: q.answer_data?.keywords || [] } as QuizProblem;
         }
@@ -113,7 +119,16 @@ export default function QuizRenderer({ content, componentId, courseId, onComplet
                 if (content && content.startsWith('{')) {
                     const parsed = JSON.parse(content);
                     if (parsed && Array.isArray(parsed.problems)) {
-                        setProblems(parsed.problems);
+                        const enrichedProblems = parsed.problems.map((p: any) => {
+                            if (p.type === 'assignment') {
+                                const extra = ['html', 'qmd', 'zip', 'pdf', 'jpg', 'png', 'docx'];
+                                p.allowedFileTypes = Array.from(new Set([...(p.allowedFileTypes || []), ...extra]));
+                                p.requireText = false;
+                                p.min_length = 0;
+                            }
+                            return p;
+                        });
+                        setProblems(enrichedProblems);
                     }
                 } else if (content && content.trim()) {
                     setProblems([{

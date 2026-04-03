@@ -50,7 +50,7 @@ export default function QuizBuilder({ initialContent, onChange }: QuizBuilderPro
         } else if (type === 'descriptive') {
             newProb = { ...newProb, min_length: 50, keywords: [] } as DescriptiveProblem;
         } else if (type === 'assignment') {
-            newProb = { ...newProb, allowedFileTypes: ['pdf', 'jpg', 'png', 'docx'], maxFileSize: 10, requireText: true, min_length: 100 } as AssignmentProblem;
+            newProb = { ...newProb, allowedFileTypes: ['pdf', 'jpg', 'png', 'docx', 'html', 'zip', 'qmd'], maxFileSize: 10, requireText: false, min_length: 0 } as AssignmentProblem;
         }
         
         updateParent([...problems, newProb]);
@@ -251,7 +251,7 @@ export default function QuizBuilder({ initialContent, onChange }: QuizBuilderPro
                                                                 const arr = e.target.value.split(',').map(s => s.trim().toLowerCase()).filter(s => s);
                                                                 updateProblem(idx, { allowedFileTypes: arr });
                                                             }}
-                                                            placeholder="pdf, jpg, png, docx"
+                                                            placeholder="pdf, jpg, png, docx, html, zip, qmd"
                                                         />
                                                     </div>
                                                     <div className="flex flex-col gap-1 w-32">

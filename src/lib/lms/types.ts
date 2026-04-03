@@ -114,7 +114,7 @@ export interface DescriptiveProblem extends BaseQuizProblem {
 
 export interface AssignmentProblem extends BaseQuizProblem {
     type: 'assignment';
-    allowedFileTypes?: string[];  // e.g. ['pdf', 'jpg', 'png', 'docx']
+    allowedFileTypes?: string[];  // e.g. ['pdf', 'jpg', 'png', 'docx', 'html', 'zip', 'qmd']
     maxFileSize?: number;         // in MB, default 10
     requireText?: boolean;        // whether text response is also required
     min_length?: number;          // min text length if requireText
